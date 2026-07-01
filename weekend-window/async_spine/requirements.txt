@@ -1,0 +1,8 @@
+# Core spine + demo (weather.py, spine.py, run_demo.py): standard library only — no install needed.
+
+# Real Slack adapter (slack_app.py):
+slack_bolt>=1.18
+aiohttp>=3.10.6      # 3.10.6+ required on Python 3.13 (older aiohttp imports the removed `cgi` module)
+
+# Real CMA agent (when you replace the interpret() seam):
+anthropic>=0.40

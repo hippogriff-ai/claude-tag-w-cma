@@ -1,0 +1,89 @@
+"""
+spine.py — the async spine: `schedule_monitor` / `cancel_monitor`.
+
+This is the whole point of the demo: a watch the agent stands up ON REQUEST that
+re-checks on a cadence and **notifies only when the weather-state changes** — then
+goes quiet again. The "what did I last say" state lives right here (in the running
+monitor), mirroring "the model owns its memory".
+
+A monitor is a task with: a source (real or scripted), the window it watches, a
+cadence, a stop time, and an `on_update(state, first)` callback (the sink — console
+now, Slack later). Nothing runs repetitively without a reason: monitors are created
+per request, bounded by `until`, and cancellable.
+"""
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass
+from typing import Callable, Optional
+
+
+@dataclass
+class Monitor:
+    id: str
+    label: str                       # e.g. "Central Park · Sat afternoon"
+    source: object                   # OpenMeteoSource | ScriptedSource
+    window: tuple                    # (date, start_hour, end_hour)
+    cadence_s: float
+    on_update: Callable              # (WeatherState, first: bool) -> None
+    max_ticks: Optional[int] = None  # stop after N checks (bounds the demo)
+
+
+class MonitorManager:
+    """Holds the live monitors. schedule_monitor / cancel_monitor are what the agent calls."""
+
+    def __init__(self):
+        self._tasks: dict[str, asyncio.Task] = {}
+        self._last: dict[str, object] = {}     # monitor_id -> last WeatherState we posted
+
+    def schedule_monitor(self, m: Monitor) -> str:
+        """Stand up a recurring check. Returns the monitor id."""
+        if m.id in self._tasks:
+            self.cancel_monitor(m.id)
+        self._tasks[m.id] = asyncio.ensure_future(self._run(m))
+        return m.id
+
+    def cancel_monitor(self, monitor_id: str) -> bool:
+        t = self._tasks.pop(monitor_id, None)
+        self._last.pop(monitor_id, None)
+        if t and not t.done():
+            t.cancel()
+            return True
+        return False
+
+    def active(self):
+        return list(self._tasks.keys())
+
+    async def join(self):
+        """Wait for all monitors to finish (used by the demo)."""
+        if self._tasks:
+            await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+
+    async def _run(self, m: Monitor):
+        ticks = 0
+        try:
+            while True:
+                try:
+                    state = m.source.state(m.window)
+                except Exception as e:            # fault tolerance: one bad check doesn't kill the watch
+                    print(f"   ⚠ {m.label}: check failed ({e}); will retry")
+                    state = None
+
+                if state is not None:
+                    last = self._last.get(m.id)
+                    if state != last:             # ← the essence: post ONLY on change
+                        first = last is None
+                        self._last[m.id] = state
+                        m.on_update(state, first)
+                    # else: unchanged → stay quiet (no spam)
+
+                ticks += 1
+                exhausted = getattr(m.source, "exhausted", False)
+                if (m.max_ticks and ticks >= m.max_ticks) or exhausted:
+                    break
+                await asyncio.sleep(m.cadence_s)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._tasks.pop(m.id, None)
+            self._last.pop(m.id, None)

@@ -1,0 +1,9 @@
+# secrets & per-user state
+.env
+.env.local
+**/cma_config.json
+
+# python
+__pycache__/
+*.pyc
+.venv/
