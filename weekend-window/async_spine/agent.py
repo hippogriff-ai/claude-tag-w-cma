@@ -39,20 +39,40 @@ SYSTEM = (
     "to you, and messages are labelled with who is speaking, so remember what each "
     "person said (e.g. one has time Saturday afternoon, another is free both days).\n\n"
     "Your specialty is the weekend weather for the places they might ride. When someone "
-    "asks you to watch / keep an eye on / monitor a place, call schedule_monitor with the "
-    "place name — after that you ping the channel on your OWN if the outlook changes "
-    "(e.g. clear turns to thunderstorm), so they don't have to keep asking. When someone "
-    "says stop / cancel / never mind, call cancel_monitor.\n\n"
+    "asks what the weather is or will be like somewhere, call get_forecast for that place "
+    "and answer from the result. When someone asks you to watch / keep an eye on / monitor "
+    "a place, call schedule_monitor with the place name — after that you ping the channel "
+    "on your OWN if the outlook changes (e.g. clear turns to thunderstorm), so they don't "
+    "have to keep asking. When someone says stop / cancel / never mind, call cancel_monitor.\n\n"
     "You can also just chat: help them weigh Saturday vs Sunday, suggest what to pack, "
     "answer questions. Keep replies short and warm — this is Slack, a sentence or two. "
     "Place names are enough; never ask for coordinates or exact times. If you genuinely "
     "can't tell which place they mean, ask."
 )
 
-# The two custom tools. The model decides when to call them; the broker (slack_app)
-# supplies the handlers that actually touch the spine + Slack. Prescriptive
+# The custom tools. The model decides when to call them; the broker (slack_app)
+# supplies the handlers that actually touch weather/geocoding/the spine. Prescriptive
 # "call this when…" descriptions matter — they drive the model's should-call rate.
 TOOLS = [
+    {
+        "name": "get_forecast",
+        "description": (
+            "Look up a place's weekend riding outlook RIGHT NOW (real forecast for the "
+            "upcoming Saturday window). Call this whenever someone asks what the weather "
+            "is or will be like somewhere — 'what's the weather in Central Park?', 'will "
+            "it rain Saturday?'. Pass the place name people used."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "place": {
+                    "type": "string",
+                    "description": "The place to look up, as a plain name, e.g. 'Central Park'.",
+                }
+            },
+            "required": ["place"],
+        },
+    },
     {
         "name": "schedule_monitor",
         "description": (

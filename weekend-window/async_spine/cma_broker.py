@@ -104,6 +104,26 @@ async def provision(client) -> dict:
         cfg["agent_id"] = agent.id
         cfg["agent_version"] = getattr(agent, "version", None)
         save_config(cfg)
+    else:
+        # sync: if the local tool set or system prompt drifted, publish a new agent
+        # version and retire the existing channel sessions (they pin the old version;
+        # the memory store carries the durable knowledge into the fresh ones).
+        remote = await client.beta.agents.retrieve(cfg["agent_id"])
+        remote_tools = {getattr(t, "name", "") for t in (getattr(remote, "tools", []) or [])
+                        if getattr(t, "type", "") == "custom"}
+        local_tools = {t["name"] for t in TOOLS}
+        if remote_tools != local_tools or getattr(remote, "system", None) != CMA_SYSTEM:
+            updated = await client.beta.agents.update(
+                cfg["agent_id"],
+                version=getattr(remote, "version", 1),
+                system=CMA_SYSTEM,
+                tools=_agent_tools(),
+            )
+            cfg["agent_version"] = getattr(updated, "version", None)
+            n = len(cfg.pop("sessions", {}) or {})
+            save_config(cfg)
+            print(f"   agent updated to version {cfg['agent_version']} "
+                  f"(tools: {sorted(local_tools)}); {n} session(s) retired")
     print(f"   agent        {cfg['agent_id']} (model {CMA_MODEL})")
 
     if not cfg.get("memory_store_id"):
@@ -168,6 +188,7 @@ class Broker:
         save_config(cfg)
         self._caught_up.add(session.id)
         print(f"   session for {channel}: {session.id}")
+        print(f"   trace: https://platform.claude.com/workspaces/default/sessions/{session.id}")
         return session.id
 
     async def _answer_backlog(self, session_id: str) -> None:

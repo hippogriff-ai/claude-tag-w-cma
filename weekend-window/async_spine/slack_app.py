@@ -152,6 +152,20 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
     if source_factory is None:
         source_factory = OpenMeteoSource
 
+    async def forecast_tool(place: str) -> str:
+        geo = await loop.run_in_executor(None, geocode, place)
+        if not geo:
+            return (f"Couldn't find a place called {place!r} — ask them for a fuller "
+                    f"name (e.g. add the city).")
+        lat, lon, resolved = geo
+        window = _next_saturday_window()
+        try:
+            st = await loop.run_in_executor(None, OpenMeteoSource(lat, lon).state, window)
+        except Exception as e:
+            return f"tool error: live forecast fetch failed ({e}) — try again in a minute."
+        return (f"{resolved} — Saturday {window[0]}, {window[1]}:00–{window[2]}:00: "
+                f"state={st.category}; {st.summary}")
+
     async def schedule_tool(place: str) -> str:
         geo = await loop.run_in_executor(None, geocode, place)   # don't block the loop
         if not geo:
@@ -193,7 +207,8 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
         return (f"Stopped {n} watch(es) for this channel." if n
                 else "There were no active watches here to stop.")
 
-    return {"schedule_monitor": schedule_tool, "cancel_monitor": cancel_tool}
+    return {"get_forecast": forecast_tool, "schedule_monitor": schedule_tool,
+            "cancel_monitor": cancel_tool}
 
 
 _NAMES: dict[str, str] = {}
