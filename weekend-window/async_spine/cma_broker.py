@@ -188,7 +188,6 @@ class Broker:
         save_config(cfg)
         self._caught_up.add(session.id)
         print(f"   session for {channel}: {session.id}")
-        print(f"   trace: https://platform.claude.com/workspaces/default/sessions/{session.id}")
         return session.id
 
     async def _answer_backlog(self, session_id: str) -> None:
