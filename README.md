@@ -1,5 +1,10 @@
 # Claude Tag, rebuilt on Claude Managed Agents
 
+[![seeded tests](https://img.shields.io/badge/seeded_tests-17%2F17-brightgreen)](weekend-window/async_spine/test_spine.py)
+[![live scenarios](https://img.shields.io/badge/live_scenarios_S1–S8-18%2F18-brightgreen)](weekend-window/async_spine/scenarios.py)
+[![CMA](https://img.shields.io/badge/Claude_Managed_Agents-beta-b399f5)](https://platform.claude.com/docs/en/managed-agents/overview)
+[![python](https://img.shields.io/badge/python-3.10%2B-blue)](weekend-window/async_spine/requirements.txt)
+
 A minimal, runnable teaching demo of how the **Claude Tag** experience — a shared AI teammate living in a Slack
 channel — is reconstructed from **Claude Managed Agents (CMA)** primitives. The scenario: two friends planning a
 weekend bike ride ask **@weekend-window** to watch the weather; it pings the channel **on its own** when the
