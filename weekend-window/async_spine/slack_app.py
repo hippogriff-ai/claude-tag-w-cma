@@ -245,45 +245,49 @@ async def _render(client, text: str, bot_uid: str) -> str:
     return " ".join(out.split())
 
 
-async def _gather_context(client, channel: str, thread_ts: str, event_ts: str) -> list[str]:
-    """Claude-Tag-style context pull: the last 50 messages of the thread (when tagged in
-    a thread) or the last 20 channel messages (at the root) — minus what this channel's
-    session has already been shown (a per-thread/channel cursor persisted in the config;
-    the CMA session is stateful, so unlike stateless Tag we must not resend history)."""
+async def _gather_context(client, channel: str, thread_ts: str, event_ts: str):
+    """Conversation catch-up for the session: the unseen MAIN-CHANNEL messages (last 20,
+    like Claude Tag's channel pull) PLUS — when tagged in a thread — the unseen THREAD
+    messages (last 50). Richer than stateless Tag (thread-only in threads) on purpose:
+    availability lives in the main chat while logistics live in threads, and the stateful
+    session must see both. Per-channel/thread cursors prevent resending history."""
     import cma_broker
     bot = await _bot_uid(client)
     cfg = cma_broker.load_config()
     cursors = cfg.setdefault("context_cursors", {})
     in_thread = thread_ts != event_ts
-    lines: list[str] = []
-    try:
-        if in_thread:
-            key = f"{channel}:{thread_ts}"
-            r = await client.conversations_replies(channel=channel, ts=thread_ts, limit=50)
-            msgs = r.get("messages", [])                      # oldest → newest
-        else:
-            key = channel
-            r = await client.conversations_history(channel=channel, limit=20)
-            msgs = list(reversed(r.get("messages", [])))      # newest-first → oldest-first
+
+    async def unseen(msgs, key, root_only):
         seen = float(cursors.get(key, 0))
+        out = []
         for m in msgs:
             ts = m.get("ts", "0")
             if float(ts) <= seen or ts == event_ts:           # already relayed / the mention itself
                 continue
             if m.get("user") == bot or m.get("bot_id"):       # our own posts are in the session already
                 continue
-            if not in_thread and m.get("thread_ts") not in (None, ts):
+            if root_only and m.get("thread_ts") not in (None, ts):
                 continue                                      # root view: skip thread replies
             who = await _speaker(client, m.get("user", "someone"))
             txt = await _render(client, m.get("text", ""), bot)
             if txt:
-                lines.append(f"{who}: {txt}")
+                out.append(f"{who}: {txt}")
         cursors[key] = event_ts
+        return out
+
+    root_lines: list[str] = []
+    thread_lines: list[str] = []
+    try:
+        r = await client.conversations_history(channel=channel, limit=20)
+        root_lines = await unseen(list(reversed(r.get("messages", []))), channel, root_only=True)
+        if in_thread:
+            r = await client.conversations_replies(channel=channel, ts=thread_ts, limit=50)
+            thread_lines = await unseen(r.get("messages", []), f"{channel}:{thread_ts}", root_only=False)
         cma_broker.save_config(cfg)
     except Exception as e:
         print(f"   (couldn't fetch conversation history: {e} — bot in channel? "
               f"scopes groups:history / channels:history granted?)")
-    return lines
+    return root_lines, thread_lines
 
 
 async def _compose_turn(client, event) -> str:
@@ -293,11 +297,14 @@ async def _compose_turn(client, event) -> str:
     bot = await _bot_uid(client)
     speaker = await _speaker(client, event.get("user", "someone"))
     clean = await _render(client, event.get("text", ""), bot)
-    context = await _gather_context(client, channel, thread_ts, event_ts)
-    if context:
-        return ("[channel conversation since your last look]\n" + "\n".join(context)
-                + f"\n[tagging you] {speaker}: {clean}")
-    return f"{speaker}: {clean}"
+    root_lines, thread_lines = await _gather_context(client, channel, thread_ts, event_ts)
+    parts = []
+    if root_lines:
+        parts.append("[in the main channel since your last look]\n" + "\n".join(root_lines))
+    if thread_lines:
+        parts.append("[in this thread]\n" + "\n".join(thread_lines))
+    parts.append(f"[tagging you] {speaker}: {clean}" if parts else f"{speaker}: {clean}")
+    return "\n".join(parts)
 
 
 def build_app():
