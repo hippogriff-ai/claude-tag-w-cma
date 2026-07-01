@@ -18,7 +18,8 @@ Open-Meteo pull to prove the live path.
 ## Wire real Slack (~15 min, Socket Mode — no public URL)
 
 1. Create a Slack app at api.slack.com/apps → enable **Socket Mode** → generate an app-level token (`connections:write`).
-2. Bot scopes: `app_mentions:read`, `chat:write`, `groups:history`; subscribe to the `app_mention` event; install to the workspace.
+2. Bot scopes: `app_mentions:read`, `chat:write`, `groups:history`, `users:read`, `channels:history`;
+   subscribe to the `app_mention` event; install to the workspace.
 3. Two riders = two accounts via `you+alice@gmail.com` / `you+bob@gmail.com` email aliases; make a **private channel**, invite the bot + both.
 4. `cp .env.example .env.local` and fill `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` + `ANTHROPIC_API_KEY`;
    `pip install -r requirements.txt` (there's also a `/setup` skill that coaches the whole thing, and

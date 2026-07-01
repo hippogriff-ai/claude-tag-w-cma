@@ -59,7 +59,8 @@ It's gitignored. You create the *shape*; the user fills the *values*.
   `connections:write`). That token is `SLACK_APP_TOKEN`.
 
 ### 2. Scopes + events + install  →  `SLACK_BOT_TOKEN` (`xoxb-…`)
-- **OAuth & Permissions → Bot Token Scopes**: add `app_mentions:read`, `chat:write`, `groups:history`.
+- **OAuth & Permissions → Bot Token Scopes**: add `app_mentions:read`, `chat:write`, `groups:history`,
+  `users:read` (resolve rider names), and `channels:history` (context pull in public channels).
 - **Event Subscriptions** → On → **Subscribe to bot events**: add `app_mention`.
 - **Install App → Install to <workspace> → Allow** → copy the **Bot User OAuth Token** (`xoxb-…`). That's
   `SLACK_BOT_TOKEN`.

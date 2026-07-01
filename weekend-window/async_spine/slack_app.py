@@ -212,21 +212,92 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
 
 
 _NAMES: dict[str, str] = {}
+_BOT_UID: list = [None]
+_MENTION = re.compile(r"<@([UW][A-Z0-9]+)>")
 
 
 async def _speaker(client, user_id: str) -> str:
     """Display name for per-rider attribution; falls back to the Slack user id."""
     if user_id in _NAMES:
         return _NAMES[user_id]
-    name = user_id
     try:
         info = await client.users_info(user=user_id)
         p = info["user"].get("profile", {})
         name = p.get("display_name") or p.get("real_name") or user_id
+        _NAMES[user_id] = name          # cache successes only, so adding users:read
+        return name                     # later doesn't leave stale raw ids behind
     except Exception:
-        pass   # missing users:read scope — the id is still a stable per-rider label
-    _NAMES[user_id] = name
-    return name
+        return user_id                  # missing users:read scope — still a stable label
+
+
+async def _bot_uid(client) -> str:
+    if _BOT_UID[0] is None:
+        _BOT_UID[0] = (await client.auth_test())["user_id"]
+    return _BOT_UID[0]
+
+
+async def _render(client, text: str, bot_uid: str) -> str:
+    """Slack markup → plain text: drop the bot's own mention, name other people's."""
+    out = text
+    for uid in set(_MENTION.findall(text)):
+        rep = "" if uid == bot_uid else "@" + await _speaker(client, uid)
+        out = out.replace(f"<@{uid}>", rep)
+    return " ".join(out.split())
+
+
+async def _gather_context(client, channel: str, thread_ts: str, event_ts: str) -> list[str]:
+    """Claude-Tag-style context pull: the last 50 messages of the thread (when tagged in
+    a thread) or the last 20 channel messages (at the root) — minus what this channel's
+    session has already been shown (a per-thread/channel cursor persisted in the config;
+    the CMA session is stateful, so unlike stateless Tag we must not resend history)."""
+    import cma_broker
+    bot = await _bot_uid(client)
+    cfg = cma_broker.load_config()
+    cursors = cfg.setdefault("context_cursors", {})
+    in_thread = thread_ts != event_ts
+    lines: list[str] = []
+    try:
+        if in_thread:
+            key = f"{channel}:{thread_ts}"
+            r = await client.conversations_replies(channel=channel, ts=thread_ts, limit=50)
+            msgs = r.get("messages", [])                      # oldest → newest
+        else:
+            key = channel
+            r = await client.conversations_history(channel=channel, limit=20)
+            msgs = list(reversed(r.get("messages", [])))      # newest-first → oldest-first
+        seen = float(cursors.get(key, 0))
+        for m in msgs:
+            ts = m.get("ts", "0")
+            if float(ts) <= seen or ts == event_ts:           # already relayed / the mention itself
+                continue
+            if m.get("user") == bot or m.get("bot_id"):       # our own posts are in the session already
+                continue
+            if not in_thread and m.get("thread_ts") not in (None, ts):
+                continue                                      # root view: skip thread replies
+            who = await _speaker(client, m.get("user", "someone"))
+            txt = await _render(client, m.get("text", ""), bot)
+            if txt:
+                lines.append(f"{who}: {txt}")
+        cursors[key] = event_ts
+        cma_broker.save_config(cfg)
+    except Exception as e:
+        print(f"   (couldn't fetch conversation history: {e} — bot in channel? "
+              f"scopes groups:history / channels:history granted?)")
+    return lines
+
+
+async def _compose_turn(client, event) -> str:
+    """The full user turn for the agent: catch-up context + the tagged message."""
+    channel, event_ts = event["channel"], event["ts"]
+    thread_ts = event.get("thread_ts") or event_ts
+    bot = await _bot_uid(client)
+    speaker = await _speaker(client, event.get("user", "someone"))
+    clean = await _render(client, event.get("text", ""), bot)
+    context = await _gather_context(client, channel, thread_ts, event_ts)
+    if context:
+        return ("[channel conversation since your last look]\n" + "\n".join(context)
+                + f"\n[tagging you] {speaker}: {clean}")
+    return f"{speaker}: {clean}"
 
 
 def build_app():
@@ -247,15 +318,16 @@ def build_app():
 
         if mode == "cma":
             try:
-                speaker = await _speaker(client, event.get("user", ""))
-                reply = await brain.run_turn(channel, f"{speaker}: {text}", handlers)
+                turn = await _compose_turn(client, event)
+                reply = await brain.run_turn(channel, turn, handlers)
                 await say(text=reply, thread_ts=thread_ts)
                 return
             except Exception as e:
                 print(f"   (CMA turn failed: {e}; falling back to rule-based)")
         elif mode == "messages":
             try:
-                reply = await brain.respond(channel, event.get("user", "someone"), text, handlers)
+                turn = await _compose_turn(client, event)
+                reply = await brain.respond(channel, "", turn, handlers)
                 await say(text=reply, thread_ts=thread_ts)
                 return
             except Exception as e:

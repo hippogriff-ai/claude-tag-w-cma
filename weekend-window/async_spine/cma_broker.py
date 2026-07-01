@@ -43,7 +43,10 @@ CMA_SYSTEM = SYSTEM + (
     "answer. Keep notes small; organize them however you see fit.\n\n"
     "Messages that begin with \"[weather-watch update\" are results from YOUR OWN weather watch, "
     "not a human. Reply with one short channel ping: what changed, the bad hours if any, and what "
-    "the riders should do. Don't address anyone as if they sent it — just write the ping."
+    "the riders should do. Don't address anyone as if they sent it — just write the ping.\n\n"
+    "Some turns start with a \"[channel conversation since your last look]\" block: that's a "
+    "catch-up of what the riders said in Slack while you weren't tagged. Read it as context you "
+    "were present for, then respond to the tagged request after \"[tagging you]\"."
 )
 
 

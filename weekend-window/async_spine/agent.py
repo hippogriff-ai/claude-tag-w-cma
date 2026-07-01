@@ -128,7 +128,7 @@ class Agent:
         channel/thread so the model's tool calls land in the right Slack place.
         """
         msgs = self._history.setdefault(channel_id, [])
-        msgs.append({"role": "user", "content": f"{speaker}: {text}"})
+        msgs.append({"role": "user", "content": f"{speaker}: {text}" if speaker else text})
 
         try:
             for _ in range(_MAX_TOOL_ROUNDS):
