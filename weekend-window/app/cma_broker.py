@@ -5,7 +5,8 @@ Mirrors the cwc-workshops/research-desk pattern (provision.ts + orchestrator.ts)
 
   · provision()        — ONCE, idempotent: environments.create + agents.create (system
                          prompt + the custom tools from agent.py live ON the agent
-                         object) + memory_stores.create. IDs in cma_config.json.   (C1)
+                         object). IDs in cma_config.json. Memory stores are created
+                         per channel at first contact (_ensure_store).             (C1)
   · Broker.run_turn()  — one durable session per Slack channel, reused across turns
                          and restarts (session id persisted; memory store mounted
                          at session create).                                       (C2, C4)
@@ -81,7 +82,8 @@ def _agent_tools() -> list:
 
 
 async def provision(client) -> dict:
-    """Create environment + agent + memory store once; reuse IDs from cma_config.json."""
+    """Create environment + agent once; reuse IDs from cma_config.json. (Memory stores
+    are per channel — created lazily at first contact by Broker._ensure_store.)"""
     cfg = load_config()
 
     if not cfg.get("environment_id"):
@@ -185,8 +187,12 @@ class Broker:
                         await self._answer_backlog(sid)
                         self._caught_up.add(sid)
                     return sid
-            except Exception:
-                pass   # fall through: create a fresh session (memory store carries continuity)
+            except Exception as e:
+                from anthropic import NotFoundError
+                if not isinstance(e, NotFoundError):
+                    raise   # transient error — don't silently abandon the durable session
+                print(f"   (session {sid} is gone — creating a fresh one; "
+                      f"the memory store carries the group's continuity)")
 
         store_id = await self._ensure_store(channel)
         session = await self._client.beta.sessions.create(
@@ -209,9 +215,10 @@ class Broker:
         return session.id
 
     async def _answer_backlog(self, session_id: str) -> None:
-        """C3: zero permanently-unanswered tool calls — unblock calls orphaned by a broker restart."""
+        """C3: zero permanently-unanswered tool calls — unblock calls orphaned by a broker
+        restart or by a turn that died mid-stream (timeout, dropped connection)."""
         page = await self._client.beta.sessions.events.list(session_id=session_id)
-        events = list(getattr(page, "data", []) or [])
+        events = [e async for e in page]   # walk every page — stale calls sit at the newest end
         answered = {getattr(e, "custom_tool_use_id", "") for e in events
                     if getattr(e, "type", "") == "user.custom_tool_result"}
         stale = [e for e in events
@@ -221,8 +228,8 @@ class Broker:
                 "type": "user.custom_tool_result",
                 "custom_tool_use_id": e.id,
                 "content": [{"type": "text",
-                             "text": "tool error: the watch broker restarted before this call was "
-                                     "served — ask the rider to repeat the request."}],
+                             "text": "tool error: the broker couldn't serve this call (restart "
+                                     "or timeout) — ask the rider to repeat the request."}],
             }])
             print(f"   answered stale tool call {e.id}")
 
@@ -233,8 +240,18 @@ class Broker:
         """
         async with self._lock(channel):
             session_id = await self.ensure_session(channel)
-            return await asyncio.wait_for(
-                self._drain(session_id, text, handlers), timeout=self.TURN_TIMEOUT)
+            try:
+                return await asyncio.wait_for(
+                    self._drain(session_id, text, handlers), timeout=self.TURN_TIMEOUT)
+            except Exception:
+                # A turn that died mid-stream may have left a custom_tool_use pending —
+                # the session would sit at requires_action and queue every later turn
+                # behind it until a restart. Sweep the backlog before surfacing the error.
+                try:
+                    await self._answer_backlog(session_id)
+                except Exception as sweep_err:
+                    print(f"   (backlog sweep after failed turn also failed: {sweep_err})")
+                raise
 
     async def _drain(self, session_id: str, text: str, handlers: dict) -> str:
         """Stream-first: open the stream, send the turn, answer tools on the same stream,

@@ -10,5 +10,6 @@ enforced by CI on every push.) Each battery run is logged here with its date and
 | 2026-07-01 | v1 | initial CMA port (session-per-channel, shared store) | 17/18 | — | the one failure was a **harness assertion bug**, not agent behavior: S5's check required the word "storm" absent from the all-clear ping, but the model correctly wrote "storms gone, clear and pleasant". Assertion fixed to check the positive signal. |
 | 2026-07-01 | v1 | same, assertion fixed | 18/18 | 5 / 5 / 5 / 4 | R4 deduction: judge flagged the three first-outlook "all green" pings as borderline chatty (they are by design — SPEC posts a first outlook per watch). |
 | 2026-07-01 | v6 | per-channel memory stores; four tools (get_forecast/list_monitors added); context catch-up pull | 18/18 | 5 / 5 / 5 / 5 | lazy store creation verified live (C_SCEN got its own store); S7 recall via the channel's own store. |
+| 2026-07-01 | v8 | same + broker review fixes (paginated backlog sweep, sweep after a failed turn, session-resume errors surfaced instead of swallowed) | 18/18 | 5 / 5 / 5 / 5 | validation run after the review fixes — agent object unchanged. Note: the battery starts fresh sessions, so the resume/backlog paths themselves are exercised by the bot-restart walkthrough, not here. |
 
 To add a run: `python scenarios.py` (needs `ANTHROPIC_API_KEY`; ~13 live turns), then append a row.

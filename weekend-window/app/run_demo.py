@@ -86,7 +86,8 @@ def real_pull():
     print("=" * 74)
     print("LIVE PULL — same classifier against real Open-Meteo (Central Park).")
     print("=" * 74)
-    sat = date(2026, 7, 1) + timedelta((5 - date(2026, 7, 1).weekday()) % 7)  # next Saturday
+    today = date.today()
+    sat = today + timedelta((5 - today.weekday()) % 7)  # next Saturday
     try:
         src = OpenMeteoSource(*CENTRAL_PARK)
         st = src.state((sat.isoformat(), 12, 18))

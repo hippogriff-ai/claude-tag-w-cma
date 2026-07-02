@@ -48,7 +48,7 @@ python run_demo.py                  # no credentials: watch → change → proac
 # guided walkthrough (the repo ships the skill), or follow app/README.md
 cp .env.example .env.local          # fill SLACK_BOT_TOKEN, SLACK_APP_TOKEN, ANTHROPIC_API_KEY
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python provision.py       # once, idempotent: CMA environment + agent + memory store
+.venv/bin/python provision.py       # once, idempotent: CMA environment + agent (per-channel memory stores at first contact)
 .venv/bin/python slack_app.py       # START THE BOT — long-lived; run it in its own terminal
 ```
 

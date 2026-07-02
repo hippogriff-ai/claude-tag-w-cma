@@ -77,14 +77,16 @@ It's gitignored. You create the *shape*; the user fills the *values*.
 - Install deps into a venv (in `weekend-window/app/`):
   `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt` — and make sure
   `ANTHROPIC_API_KEY` is in `.env.local`. **Use `.venv/bin/python` for every command below** (or activate the venv).
-- `.venv/bin/python provision.py` → creates the CMA environment + agent + memory store; IDs land in
-  `cma_config.json` (gitignored). Re-running creates nothing new (it also syncs a new agent version if the
-  tools/system prompt changed, retiring old channel sessions).
+- `.venv/bin/python provision.py` → creates the CMA environment + agent; IDs land in `cma_config.json`
+  (gitignored). Memory stores are per channel — created automatically at each channel's first contact, not here.
+  Re-running creates nothing new (it also syncs a new agent version if the tools/system prompt changed,
+  retiring old channel sessions).
 
 ### 5. Run it (the start command)
 - `.venv/bin/python slack_app.py` → prints "CMA broker ready" + "weekend-window is live on Slack (Socket Mode)."
-  Run it in a dedicated terminal — it's a long-lived server; Ctrl-C stops it, and active weather watches do NOT
-  survive a restart (riders just re-ask). Never run two copies (they'd double-answer mentions).
+  Run it in a dedicated terminal — it's a long-lived server; Ctrl-C stops it. Active weather watches DO survive
+  a restart (specs are persisted and rehydrated on start; an unchanged outlook is never re-announced). Never run
+  two copies (they'd double-answer mentions).
   (It auto-loads `.env.local`. Without `cma_config.json` it falls back to the Messages-API brain; without a key,
   to a regex parser.)
 - In the channel, talk to it naturally: `@weekend-window can you keep an eye on Central Park and ping us if it

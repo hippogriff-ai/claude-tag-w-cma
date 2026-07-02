@@ -60,7 +60,7 @@ intent-parser (no key at all). The spine (`weather.py` + `spine.py`) is identica
    without printing them.) Then, from this directory:
 
 ```
-.venv/bin/python provision.py     # once, idempotent: CMA environment + agent + memory store
+.venv/bin/python provision.py     # once, idempotent: CMA environment + agent (per-channel memory stores at first contact)
 .venv/bin/python slack_app.py     # START THE BOT — long-lived; run in your own terminal
 .venv/bin/python scenarios.py     # optional: the S1–S8 acceptance battery + rubric judge, live
 ```
@@ -138,7 +138,7 @@ arriving with **no human involved**, and the memory `Edit` from "I don't ride in
 | `slack_app.py` | real Slack Bolt (Socket Mode) adapter — wires a brain to Slack + supplies the tool handlers |
 | `run_demo.py` | runnable, credential-free proof |
 | `setup_check.py` | no-secrets doctor: verifies `.env.local`, token shapes, and Slack auth |
-| `test_spine.py` | seeded deterministic suite — SPEC §A metrics M2, M3/M4, M6/M7, M10, M15 + `describe()` ground truth (20 checks) |
+| `test_spine.py` | seeded deterministic suite — SPEC §A metrics M2, M3/M4, M6/M7, M10, M15, M16 + `describe()` ground truth (25 checks) |
 | `scenarios.py` | the SPEC §C/§D battery run live — S1–S8 as a **three-rider script** (alice, bob, carol — carol recalls alice's preference she never heard, proving memory is group-shared) with scripted weather + LLM-judged rubrics (real CMA, real model, real spine; Slack transport simulated) |
 
 The stripped concept lives in `../SPEC.md`; the verified platform facts in its appendix.

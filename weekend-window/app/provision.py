@@ -1,7 +1,8 @@
 """
 provision.py — one-time CMA provisioning (SPEC C1). Safe to re-run: idempotent.
 
-    python provision.py         # creates environment + agent + memory store, saves IDs
+    python provision.py         # creates environment + agent, saves IDs (memory stores
+                                # are per channel, created at each channel's first contact)
 
 IDs land in cma_config.json (gitignored). Re-running with the config present creates
 nothing new — it just prints the existing IDs. Requires ANTHROPIC_API_KEY (.env.local).
