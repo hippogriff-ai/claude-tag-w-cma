@@ -1,7 +1,7 @@
 """
 run_demo.py — the async spine, running, with no credentials.
 
-    python async_spine/run_demo.py
+    python app/run_demo.py
 
 It shows the essence: Alice & Bob asked the agent to watch a place; the agent
 stands up a recurring check and posts into the channel ONLY when the weather-state

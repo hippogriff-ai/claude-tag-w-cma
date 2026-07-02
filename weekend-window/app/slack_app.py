@@ -1,7 +1,7 @@
 """
 slack_app.py — real Slack adapter (Bolt + Socket Mode).
 
-    python async_spine/slack_app.py     # needs SLACK_BOT_TOKEN + SLACK_APP_TOKEN
+    python app/slack_app.py     # needs SLACK_BOT_TOKEN + SLACK_APP_TOKEN
 
 Same spine as the demo; the only difference is the sink posts to a real Slack
 channel and the trigger is a real @mention. Socket Mode = no public URL / ngrok.

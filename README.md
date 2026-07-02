@@ -1,9 +1,9 @@
 # Claude Tag, rebuilt on Claude Managed Agents
 
-[![seeded tests](https://img.shields.io/badge/seeded_tests-17%2F17-brightgreen)](weekend-window/async_spine/test_spine.py)
-[![live scenarios](https://img.shields.io/badge/live_scenarios_S1–S8-18%2F18-brightgreen)](weekend-window/async_spine/scenarios.py)
+[![seeded tests](https://img.shields.io/badge/seeded_tests-17%2F17-brightgreen)](weekend-window/app/test_spine.py)
+[![live scenarios](https://img.shields.io/badge/live_scenarios_S1–S8-18%2F18-brightgreen)](weekend-window/app/scenarios.py)
 [![CMA](https://img.shields.io/badge/Claude_Managed_Agents-beta-b399f5)](https://platform.claude.com/docs/en/managed-agents/overview)
-[![python](https://img.shields.io/badge/python-3.10%2B-blue)](weekend-window/async_spine/requirements.txt)
+[![python](https://img.shields.io/badge/python-3.10%2B-blue)](weekend-window/app/requirements.txt)
 
 A minimal, runnable teaching demo of how the **Claude Tag** experience — a shared AI teammate living in a Slack
 channel — is reconstructed from **Claude Managed Agents (CMA)** primitives. The scenario: two friends planning a
@@ -25,25 +25,24 @@ host-side via custom tools" pattern.
 On every @mention the broker performs a **conversation catch-up pull** — the unseen main-channel messages plus,
 for thread mentions, the unseen thread messages — so the agent has the group's full context without being a
 listener on every message. How that works (and how it differs from stock Claude Tag) is documented in
-[`weekend-window/async_spine/README.md` → Context management](weekend-window/async_spine/README.md#context-management--how-main-chat-and-thread-context-are-taken-in).
+[`weekend-window/app/README.md` → Context management](weekend-window/app/README.md#context-management--how-main-chat-and-thread-context-are-taken-in).
 
 ## Layout
 
 ```
 weekend-window/
-  SPEC.md              the essence spec + passing criteria (Definition of Done: met 2026-07-01)
-  SPEC-reference.md    the full earlier spec — verified CMA/Slack/memory facts, original criteria
-  async_spine/         the implementation (see its README for architecture + setup)
+  SPEC.md              the essence spec + passing criteria + verified platform facts (DoD: met 2026-07-01)
+  app/                 the implementation (see its README for architecture + setup)
 .claude/skills/setup/  a /setup coach that walks the Slack app + token setup
 ```
 
 ## Quickstart
 
 ```bash
-cd weekend-window/async_spine
+cd weekend-window/app
 python run_demo.py                  # no credentials: watch → change → proactive post, in seconds
 
-# the real thing (Slack app + tokens: see async_spine/README.md or /setup)
+# the real thing (Slack app + tokens: see app/README.md or /setup)
 cp .env.example .env.local          # fill SLACK_BOT_TOKEN, SLACK_APP_TOKEN, ANTHROPIC_API_KEY
 pip install -r requirements.txt
 python provision.py                 # once, idempotent: CMA environment + agent + memory store

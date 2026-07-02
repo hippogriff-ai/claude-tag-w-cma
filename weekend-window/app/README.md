@@ -118,4 +118,4 @@ label it saw — one more reason to grant `users:read`.
 | `test_spine.py` | seeded deterministic suite (SPEC §A: M2–M15) |
 | `scenarios.py` | the SPEC §C/§D battery run live — S1–S8 with scripted weather + LLM-judged rubrics (real CMA, real model, real spine; Slack transport simulated) |
 
-The stripped concept lives in `../SPEC.md`; the full, verified-facts reference in `../SPEC-reference.md`.
+The stripped concept lives in `../SPEC.md`; the verified platform facts in its appendix.

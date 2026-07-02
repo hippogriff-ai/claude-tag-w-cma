@@ -47,7 +47,7 @@ show the three things that make Claude Tag special — nothing more:
 - **Weather** — Open-Meteo (free, no key).
 - **Async** — `schedule_monitor(location, cadence, until)` / `cancel_monitor` — custom tools the agent calls **on
   request**; the broker's timer (the async spine) is just the clockwork behind them. (Native CMA scheduled
-  Deployments don't work here — a scheduled run is a fresh session with no broker; see `SPEC-reference.md`.)
+  Deployments don't work here — a scheduled run is a fresh session with no broker; see the appendix.)
   When a watch detects a change, the broker feeds the change **into the session** as a message and the **model
   phrases the channel post** — so the agent also remembers what it last told the group, in its own context, not
   in a side ledger.
@@ -68,7 +68,7 @@ bespoke web UI. Add depth only if the demo actually needs it.
 
 ## Build order
 
-1. **The async spine** (`async_spine/`) — recurring watch + change detection + proactive notify. ✅ built
+1. **The async spine** (`app/`) — recurring watch + change detection + proactive notify. ✅ built
    (runnable credential-free: `python run_demo.py`; seeded asserts: `python test_spine.py`).
 2. Wire **real Slack** (Bolt + Socket Mode). ✅ built.
 3. Make it **conversational** (a real model decides to call `schedule_monitor` from a natural request, attributes
@@ -82,7 +82,7 @@ bespoke web UI. Add depth only if the demo actually needs it.
 
 ## Passing criteria
 
-Adapted from `SPEC-reference.md` §6–7 to the revised architecture. Design principle unchanged: **prefer verifiable
+Adapted from the earlier detailed spec's criteria to the revised architecture. Design principle unchanged: **prefer verifiable
 over judged** — deterministic seeded tests for the pure core, live scenarios for the CMA wiring, rubrics only for
 the genuinely fuzzy parts. Written so each line is an independently gradeable criterion (usable verbatim as a
 goal/outcome rubric later). M-numbers are preserved from the reference where the metric survives; dropped numbers
@@ -152,5 +152,24 @@ gated NL parsing).
 
 ---
 
-The full, heavily-detailed prior spec — with the verified CMA/Slack/memory facts and the original M1–M14/S1–S9/
-R1–R7/U/V criteria these were adapted from — is preserved in `SPEC-reference.md`.
+## Appendix — verified platform facts (don't re-derive)
+
+Established by research + adversarial verification during design; the constraints the architecture is built around.
+
+**Claude Tag** (the product being reconstructed): one shared Claude per channel, invoked by @tag; per-channel
+memory; schedules tasks for itself over hours/days; proactive/ambient posting (gated by an "ambient" setting);
+**no per-action HITL** (governed by admin allow-lists, token-spend caps, audit log); **no documented dedup or
+delivery guarantee** — "post only on change, never repeat" is a correctness property this demo adds. Context pull
+on mention: last 20 channel messages (channel mention) / last 50 thread messages (thread mention).
+
+**CMA**: the custom-tool round-trip is `requires_action → agent.custom_tool_use → user.custom_tool_result`
+(under the `managed-agents-2026-04-01` beta header). A memory store attaches at **session-create only** — no
+hot-swap onto a running session. **No session fork** (that's an Agent-SDK concept); context editing is
+Messages-API-only. `user.message` has no thread field — an in-thread @mention routes to the coordinator, so
+per-thread addressing is **broker-emulated**, not native delivery. **Scheduled Deployments don't fit this demo**:
+a scheduled run starts a fresh session with no connected broker, so nothing can answer the agent's custom tools
+or post to Slack — hence the broker-side timer behind `schedule_monitor`.
+
+**Slack**: Socket Mode needs no public URL. `chat.postMessage` has **no idempotency key** (a crash between post
+and state-write can drop/duplicate one update — accepted). A bot can't DM two *other* humans → use a private
+channel. Two rider identities = two accounts via Gmail `+alias` addresses.
