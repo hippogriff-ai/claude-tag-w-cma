@@ -22,7 +22,8 @@ Every Claude-Tag behavior is carried by a **real CMA primitive** (`cma_broker.py
 
 - **`agents.create`** (once, via `provision.py`; idempotent — IDs live in `cma_config.json`, gitignored):
   the system prompt and the **four custom tools** — `get_forecast` (live outlook, any date ≤15 days out),
-  `schedule_monitor` / `cancel_monitor` (the watches), and `list_monitors` (ground-truth watch status, so the
+  `schedule_monitor` / `cancel_monitor` (the watches — many can run at once, one per place+ride-day; cancel takes
+  an optional place/date, so "stop watching Central Park" leaves the others running), and `list_monitors` (ground-truth watch status, so the
   agent never claims a watch that died with a restart) — live **on the agent object**. Default model
   `claude-opus-4-8`; override with `WEEKEND_WINDOW_CMA_MODEL`.
 - **One durable session per channel** (= the conversation memory), reused across turns *and broker restarts* —
@@ -35,7 +36,8 @@ Every Claude-Tag behavior is carried by a **real CMA primitive** (`cma_broker.py
 - **Proactive pings go through the session**: a watch's weather change is fed in as a `[weather-watch update …]`
   message and the **model phrases the channel ping** — so it also remembers what it told the group.
 - **Watches survive restarts**: each watch's spec + last-told state are persisted (`cma_config.json`) and
-  rehydrated on broker start, seeded so an unchanged outlook is never re-announced. (The fully CMA-native
+  rehydrated on broker start, seeded so an unchanged outlook is never re-announced. The state is recorded only
+  **after** a ping posts, so delivery across a crash is **at-least-once** — repeating one update beats losing it. (The fully CMA-native
   version — scheduled Deployments + a webhook-attached broker + memory-based change detection — is designed in
   `../SPEC.md`'s appendix as the v2 direction.)
 
@@ -66,8 +68,8 @@ intent-parser (no key at all). The spine (`weather.py` + `spine.py`) is identica
 (Activated venv or system python with the deps installed? Plain `python slack_app.py` works too.)
 
 @-mention it in the channel with a real question — *"can you keep an eye on Central Park and tell us if it turns bad?"*
-… *"when is alice free again?"* … *"never mind, stop watching"*. It reads the whole channel, decides when to watch,
-and words its own replies.
+… *"when is alice free again?"* … *"stop watching Central Park"* (just that one) … *"stop watching everything"*.
+It reads the whole channel, decides when to watch, and words its own replies.
 
 ## Context management — how main-chat and thread context are taken in
 
