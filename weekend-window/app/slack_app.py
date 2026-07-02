@@ -206,12 +206,30 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
                 f"checked hourly until the ride; the channel is pinged only when the "
                 f"outlook changes. (Watches survive bot restarts.)")
 
-    def cancel_tool() -> str:
-        n = sum(MGR.cancel_monitor(mid) for mid in MGR.active()
-                if mid.startswith(channel + ":"))
-        _unpersist_watches(channel)
-        return (f"Stopped {n} watch(es) for this channel." if n
-                else "There were no active watches here to stop.")
+    def cancel_tool(place: str = None, date: str = None) -> str:
+        prefix = channel + ":"
+
+        def matches(mid: str) -> bool:
+            if not mid.startswith(prefix):
+                return False
+            if place and place.lower() not in mid.lower():
+                return False
+            if date and not mid.endswith(":" + date.strip()):
+                return False
+            return True
+
+        victims = [mid for mid in MGR.active() if matches(mid)]
+        for mid in victims:
+            MGR.cancel_monitor(mid)
+        _unpersist_watches(channel, ids=victims if (place or date) else None)
+        if victims:
+            stopped = ", ".join(mid[len(prefix):] for mid in victims)
+            return f"Stopped {len(victims)} watch(es): {stopped}."
+        if place or date:
+            return (f"No active watch matched "
+                    f"{place or ''}{' on ' + date if date else ''} — call list_monitors "
+                    f"to see what's actually running.")
+        return "There were no active watches here to stop."
 
     def list_tool() -> str:
         rows = [d for d in MGR.describe() if d["id"].startswith(channel + ":")]
@@ -256,9 +274,11 @@ def _start_watch(channel, thread_ts, client, loop, brain_mode, broker,
         else:
             await client.chat_postMessage(channel=channel, thread_ts=thread_ts,
                                           text=phrase_update(resolved, st, first))
+        # persist AFTER the post succeeds → delivery is at-least-once across restarts:
+        # a crash between posting and recording repeats one update rather than losing it
+        _remember_last(mid, st)
 
     def on_update(st, first):   # the spine's callback is sync; bridge onto the loop
-        _remember_last(mid, st)                     # persist what we last told them
         loop.create_task(sink_post(st, first))
 
     # check hourly until the ride window ends (bounded at 16 days of checks)
@@ -301,12 +321,13 @@ def _remember_last(mid, st: WeatherState):
         cma_broker.save_config(cfg)
 
 
-def _unpersist_watches(channel):
+def _unpersist_watches(channel, ids=None):
+    """Drop persisted watch specs: the given ids, or every watch in the channel."""
     import cma_broker
     cfg = cma_broker.load_config()
     w = cfg.get("watches", {})
-    for mid in [k for k in w if k.startswith(channel + ":")]:
-        w.pop(mid)
+    for mid in (ids if ids is not None else [k for k in w if k.startswith(channel + ":")]):
+        w.pop(mid, None)
     cma_broker.save_config(cfg)
 
 

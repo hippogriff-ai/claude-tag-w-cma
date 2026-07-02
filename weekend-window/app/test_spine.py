@@ -164,6 +164,43 @@ def test_seed():
     check("seeded good + turns to storm → posts the change", run(good, [storm]) == ["hazard"])
 
 
+def test_cancel_scope():
+    print("scoped cancel — stop one place/date without killing the others (SPEC M15):")
+    good = WeatherState("good", (), "")
+    real_geocode = slack_app.geocode
+    slack_app.geocode = lambda name: (40.0, -73.0, name)   # offline: name is its own label
+
+    class FakeSlack:
+        async def chat_postMessage(self, **kw): pass
+
+    async def go():
+        slack_app._unpersist_watches("C_CX")
+        loop = asyncio.get_running_loop()
+        h = slack_app._make_handlers("C_CX", "T", FakeSlack(), loop, "rules", None,
+                                     source_factory=lambda a, b: ScriptedSource([good] * 999),
+                                     cadence_s=5.0)
+        await h["schedule_monitor"](place="Central Park")                      # Jul 4 default
+        await h["schedule_monitor"](place="Central Park", date="2026-07-11")   # same place, other Sat
+        await h["schedule_monitor"](place="GW Bridge")
+        results = []
+        results.append((h["cancel_monitor"](place="Central Park", date="2026-07-11"),
+                        sorted(slack_app.MGR.active())))
+        results.append((h["cancel_monitor"](place="Central Park"),
+                        sorted(slack_app.MGR.active())))
+        results.append((h["cancel_monitor"](), sorted(slack_app.MGR.active())))
+        slack_app._unpersist_watches("C_CX")
+        await slack_app.MGR.join()
+        return results
+
+    (r1, a1), (r2, a2), (r3, a3) = asyncio.run(go())
+    check("place+date cancels exactly that watch",
+          "Stopped 1" in r1 and len(a1) == 2 and not any("2026-07-11" in m for m in a1))
+    check("place cancels the remaining CP watch, GW Bridge survives",
+          "Stopped 1" in r2 and a2 == ["C_CX:GW Bridge:" + a2[0].split(":")[-1]])
+    check("bare cancel stops everything", "Stopped 1" in r3 and a3 == [])
+    slack_app.geocode = real_geocode
+
+
 def test_interpret():
     print("interpret() parsing (natural asks → intent + place):")
     check("watch <place>", slack_app.interpret("<@U1> watch Central Park and ping us")
@@ -176,7 +213,7 @@ def test_interpret():
 
 if __name__ == "__main__":
     for t in (test_classify, test_reproducible, test_change_detection, test_fault_tolerance,
-              test_cancellation, test_describe, test_seed, test_interpret):
+              test_cancellation, test_describe, test_seed, test_cancel_scope, test_interpret):
         t()
     print("-" * 48)
     print("  ALL PASS ✓" if not FAILS else f"  {len(FAILS)} FAILED: " + ", ".join(FAILS))

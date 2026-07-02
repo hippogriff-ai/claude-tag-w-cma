@@ -43,7 +43,8 @@ SYSTEM = (
     "and answer from the result. When someone asks you to watch / keep an eye on / monitor "
     "a place, call schedule_monitor with the place name — after that you ping the channel "
     "on your OWN if the outlook changes (e.g. clear turns to thunderstorm), so they don't "
-    "have to keep asking. When someone says stop / cancel / never mind, call cancel_monitor. "
+    "have to keep asking. When someone says stop / cancel / never mind, call cancel_monitor — "
+    "pass place if they mean one spot, omit it only when they clearly mean everything. "
     "When someone asks what you're watching or whether a watch is still on, call list_monitors "
     "first — it's the ground truth (a watch may have been cancelled by someone else or expired; "
     "don't trust conversation memory alone).\n\n"
@@ -115,10 +116,25 @@ TOOLS = [
     {
         "name": "cancel_monitor",
         "description": (
-            "Stop the weather watch(es) you set up for this channel. Call this when "
-            "someone says stop, cancel, never mind, or that's enough."
+            "Stop weather watch(es) in this channel. Call when someone says stop, cancel, "
+            "never mind, or that's enough. If they mean ONE spot ('stop watching Central "
+            "Park'), pass place (and date if they name a ride day); with no arguments it "
+            "stops EVERY watch in the channel — only do that when they clearly mean all."
         ),
-        "input_schema": {"type": "object", "properties": {}},
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "place": {
+                    "type": "string",
+                    "description": "Stop only the watch(es) for this place, e.g. 'Central Park'. "
+                                   "Omit to stop all watches in the channel.",
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Optional YYYY-MM-DD to narrow to one ride day's watch.",
+                },
+            },
+        },
     },
     {
         "name": "list_monitors",

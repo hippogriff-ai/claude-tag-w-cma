@@ -121,7 +121,7 @@ gated NL parsing).
 | **S4** | Re-check, no change | silence | M7 live |
 | **S5** | Storm clears | one more post (return-to-good is a change) | M7 live |
 | **S6** | *"stop"* | `cancel_monitor` called; checks cease | C3 + M15 |
-| **S7** | Bot restart | same channel → session resumed or fresh session **with the memory store**; the S1 preference still known — asked by a **third rider (carol)** who never heard it, proving memory is group-shared, not per-person. **Active watches survive too**: specs are persisted and rehydrated on start, seeded with the last-told state (M16), so nothing is re-announced unchanged. (Exactly-once under crash-between-post-and-persist stays cut.) | C2 + C4 + M16 + multiplayer |
+| **S7** | Bot restart | same channel → session resumed or fresh session **with the memory store**; the S1 preference still known — asked by a **third rider (carol)** who never heard it, proving memory is group-shared, not per-person. **Active watches survive too**: specs are persisted and rehydrated on start, seeded with the last-told state (M16), so nothing is re-announced unchanged. (Delivery across a crash is **at-least-once** — the state is recorded only after the post succeeds; repeating one update beats losing it.) | C2 + C4 + M16 + multiplayer |
 | **S8** | Weather API error on one watch | that watch silent but alive; other watches keep posting | M10 live |
 
 ### D. Rubrics (LLM-judge + human spot-check, 1/3/5; target ≥ 4; R1–R2 release-gating)
