@@ -37,6 +37,8 @@ class MonitorManager:
     def __init__(self):
         self._tasks: dict[str, asyncio.Task] = {}
         self._last: dict[str, object] = {}     # monitor_id -> last WeatherState we posted
+        self._monitors: dict[str, Monitor] = {}
+        self._status: dict[str, dict] = {}     # monitor_id -> {ticks, state, at}
 
     def schedule_monitor(self, m: Monitor) -> str:
         """Stand up a recurring check. Returns the monitor id."""
@@ -45,12 +47,15 @@ class MonitorManager:
         if m.log:
             print(f"   ▶ watch started: {m.label} — every {m.cadence_s/60:g} min"
                   + (f", ≤{m.max_ticks} checks" if m.max_ticks else ""))
+        self._monitors[m.id] = m
         self._tasks[m.id] = asyncio.ensure_future(self._run(m))
         return m.id
 
     def cancel_monitor(self, monitor_id: str) -> bool:
         t = self._tasks.pop(monitor_id, None)
         self._last.pop(monitor_id, None)
+        self._monitors.pop(monitor_id, None)
+        self._status.pop(monitor_id, None)
         if t and not t.done():
             t.cancel()
             print(f"   ■ watch cancelled: {monitor_id}")
@@ -59,6 +64,23 @@ class MonitorManager:
 
     def active(self):
         return list(self._tasks.keys())
+
+    def describe(self) -> list[dict]:
+        """Ground truth about the running watches (for the agent's list_monitors tool):
+        label, cadence, checks so far, last observed state, seconds since last check."""
+        import time
+        out = []
+        for mid, m in self._monitors.items():
+            st = self._status.get(mid, {})
+            out.append({
+                "id": mid,
+                "label": m.label,
+                "cadence_s": m.cadence_s,
+                "checks": st.get("ticks", 0),
+                "last_state": st.get("state"),
+                "seconds_since_check": (time.time() - st["at"]) if "at" in st else None,
+            })
+        return out
 
     async def join(self):
         """Wait for all monitors to finish (used by the demo)."""
@@ -76,6 +98,9 @@ class MonitorManager:
                     state = None
 
                 if state is not None:
+                    import time
+                    self._status[m.id] = {"ticks": ticks + 1, "state": state.category,
+                                          "at": time.time()}
                     last = self._last.get(m.id)
                     changed = state != last
                     if m.log:
@@ -97,3 +122,5 @@ class MonitorManager:
         finally:
             self._tasks.pop(m.id, None)
             self._last.pop(m.id, None)
+            self._monitors.pop(m.id, None)
+            self._status.pop(m.id, None)

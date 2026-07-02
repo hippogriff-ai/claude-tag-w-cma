@@ -208,8 +208,23 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
         return (f"Stopped {n} watch(es) for this channel." if n
                 else "There were no active watches here to stop.")
 
+    def list_tool() -> str:
+        rows = [d for d in MGR.describe() if d["id"].startswith(channel + ":")]
+        if not rows:
+            return ("No watches are currently running for this channel. (Watches don't "
+                    "survive a bot restart — if one was set up earlier, it's gone; offer "
+                    "to re-create it.)")
+        lines = []
+        for d in rows:
+            ago = ("not checked yet" if d["seconds_since_check"] is None
+                   else f"last check {int(d['seconds_since_check'] // 60)} min ago"
+                        f" → {d['last_state']}")
+            lines.append(f"- {d['label']}: every {d['cadence_s']/60:g} min, "
+                         f"{d['checks']} check(s) so far, {ago}")
+        return "Active watches for this channel:\n" + "\n".join(lines)
+
     return {"get_forecast": forecast_tool, "schedule_monitor": schedule_tool,
-            "cancel_monitor": cancel_tool}
+            "cancel_monitor": cancel_tool, "list_monitors": list_tool}
 
 
 _NAMES: dict[str, str] = {}

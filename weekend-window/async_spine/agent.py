@@ -43,7 +43,9 @@ SYSTEM = (
     "and answer from the result. When someone asks you to watch / keep an eye on / monitor "
     "a place, call schedule_monitor with the place name — after that you ping the channel "
     "on your OWN if the outlook changes (e.g. clear turns to thunderstorm), so they don't "
-    "have to keep asking. When someone says stop / cancel / never mind, call cancel_monitor.\n\n"
+    "have to keep asking. When someone says stop / cancel / never mind, call cancel_monitor. "
+    "When someone asks what you're watching or whether a watch is still on, call list_monitors "
+    "first — it's the ground truth (watches don't survive restarts, so don't trust memory alone).\n\n"
     "You can also just chat: help them weigh Saturday vs Sunday, suggest what to pack, "
     "answer questions. Keep replies short and warm — this is Slack, a sentence or two. "
     "Place names are enough; never ask for coordinates or exact times. If you genuinely "
@@ -97,6 +99,18 @@ TOOLS = [
         "description": (
             "Stop the weather watch(es) you set up for this channel. Call this when "
             "someone says stop, cancel, never mind, or that's enough."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "list_monitors",
+        "description": (
+            "Ground truth about which weather watches are ACTUALLY running right now "
+            "(place, cadence, checks so far, last observed state). Call this BEFORE "
+            "answering 'what are you watching?' / 'is the watch still on?' — never "
+            "answer from conversation memory alone: watches do not survive a bot "
+            "restart, so a watch you remember scheduling may no longer be running. "
+            "If it's gone, say so and offer to re-create it."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },

@@ -123,6 +123,26 @@ def test_cancellation():
     check("exactly the pre-cancel post, nothing after", posts == ["good"])
 
 
+def test_describe():
+    print("describe() — ground truth for list_monitors:")
+    good = WeatherState("good", (), "")
+
+    async def run():
+        mgr = MonitorManager()
+        mid = mgr.schedule_monitor(Monitor("d", "GWB · Sat", ScriptedSource([good, good]), W, 1.0,
+                                           on_update=lambda st, first: None))
+        await asyncio.sleep(0.05)          # first tick happened
+        desc = mgr.describe()
+        mgr.cancel_monitor(mid)
+        return desc, mgr.describe()
+
+    desc, after = asyncio.run(run())
+    check("one active watch described with label + state",
+          len(desc) == 1 and desc[0]["label"] == "GWB · Sat"
+          and desc[0]["checks"] == 1 and desc[0]["last_state"] == "good")
+    check("empty after cancel", after == [])
+
+
 def test_interpret():
     print("interpret() parsing (natural asks → intent + place):")
     check("watch <place>", slack_app.interpret("<@U1> watch Central Park and ping us")
@@ -135,7 +155,7 @@ def test_interpret():
 
 if __name__ == "__main__":
     for t in (test_classify, test_reproducible, test_change_detection, test_fault_tolerance,
-              test_cancellation, test_interpret):
+              test_cancellation, test_describe, test_interpret):
         t()
     print("-" * 48)
     print("  ALL PASS ✓" if not FAILS else f"  {len(FAILS)} FAILED: " + ", ".join(FAILS))
