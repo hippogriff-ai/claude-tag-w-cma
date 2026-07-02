@@ -6,9 +6,15 @@
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](weekend-window/app/requirements.txt)
 
 A minimal, runnable teaching demo of how the **Claude Tag** experience — a shared AI teammate living in a Slack
-channel — is reconstructed from **Claude Managed Agents (CMA)** primitives. The scenario: two friends planning a
+channel — is reconstructed from **Claude Managed Agents (CMA)** primitives. The scenario: friends planning a
 weekend bike ride ask **@weekend-window** to watch the weather; it pings the channel **on its own** when the
 forecast changes.
+
+![The demo in Slack: riders plan in the channel and threads; @weekend-window answers a weather ask in the GW Bridge thread, stands up a watch on request, posts the first outlook unprompted, and memorizes "I don't ride in the rain"](docs/demo-slack.png)
+
+*Left: availability chatter in the main channel. Right: inside the 🧵 "how about GW bridge?" thread — a real
+forecast on ask, a watch on request, an unprompted first-outlook ping, and a durable preference the agent wrote
+to its memory store.*
 
 Three pillars, each carried by a named CMA primitive:
 
@@ -42,7 +48,11 @@ weekend-window/
 cd weekend-window/app
 python run_demo.py                  # no credentials: watch → change → proactive post, in seconds
 
-# the real thing (Slack app + tokens: see app/README.md or /setup)
+# the real thing — needs a Slack app + tokens. Two ways to get set up:
+#   · guided: open this repo in Claude Code and type /setup — the repo ships a
+#     setup-coach skill (.claude/skills/setup/) that walks every Slack step,
+#     creates .env.local, and verifies tokens without printing them
+#   · manual: follow the runbook in weekend-window/app/README.md
 cp .env.example .env.local          # fill SLACK_BOT_TOKEN, SLACK_APP_TOKEN, ANTHROPIC_API_KEY
 pip install -r requirements.txt
 python provision.py                 # once, idempotent: CMA environment + agent + memory store

@@ -103,6 +103,12 @@ e.g. a rider saying *"I don't ride in the rain"* produced an `Edit` of `/rider-p
 transcript, and a brand-new session (after a restart) still knows it. The identity it memorizes is the speaker
 label it saw — one more reason to grant `users:read`.
 
+All of the above, seen live in the Console's session-transcript viewer — the composed turn with both catch-up
+blocks (right pane), the `Get Forecast` / `Schedule Monitor` tool round-trips, a `[weather-watch update …]` turn
+arriving with **no human involved**, and the memory `Edit` from "I don't ride in the rain":
+
+![CMA session transcript: catch-up blocks in the user turn, tool round-trips, a proactive weather-watch turn, and a live memory write](../../docs/demo-session-transcript.png)
+
 ## Files
 
 | File | What |
