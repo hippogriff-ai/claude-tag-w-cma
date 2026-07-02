@@ -1,4 +1,4 @@
-# Weekend Window — the async spine
+# Weekend Window — the app
 
 The essence of Claude Tag in a few hundred lines: a shared agent that, when two riders ask it to watch the weather,
 **posts to the channel on its own when the forecast changes** — and never repeats the same state.
@@ -14,6 +14,31 @@ python run_demo.py
 
 Shows the recurring watch posting **only on change** (scripted so the change happens in seconds), then one real
 Open-Meteo pull to prove the live path.
+
+## The CMA architecture (the point of the demo)
+
+Every Claude-Tag behavior is carried by a **real CMA primitive** (`cma_broker.py`, mirroring the
+`cwc-workshops/research-desk` pattern):
+
+- **`agents.create`** (once, via `provision.py`; idempotent — IDs live in `cma_config.json`, gitignored):
+  the system prompt and the **four custom tools** — `get_forecast` (live outlook, any date ≤15 days out),
+  `schedule_monitor` / `cancel_monitor` (the watches), and `list_monitors` (ground-truth watch status, so the
+  agent never claims a watch that died with a restart) — live **on the agent object**. Default model
+  `claude-opus-4-8`; override with `WEEKEND_WINDOW_CMA_MODEL`.
+- **One durable session per channel** (= the conversation memory), reused across turns *and broker restarts* —
+  the multiplayer pillar.
+- **A memory store** mounted on every channel session — organization memory: the *model* writes rider preferences
+  to it with its file tools, and a brand-new session still knows them (verified live).
+- **The custom-tool round-trip**: `agent.custom_tool_use` → session idles at `requires_action` → the broker runs
+  geocoding + the spine and answers `user.custom_tool_result` (with backlog catch-up after a broker restart).
+- **Proactive pings go through the session**: a watch's weather change is fed in as a `[weather-watch update …]`
+  message and the **model phrases the channel ping** — so it also remembers what it told the group.
+
+The agent needs **no network access** (its environment is deny-by-default) — weather and geocoding run broker-side,
+the "keep execution host-side via custom tools" pattern.
+
+Fallback chain if CMA isn't provisioned: the Messages-API brain (`agent.py`, in-process transcript) → a regex
+intent-parser (no key at all). The spine (`weather.py` + `spine.py`) is identical in all three modes.
 
 ## Wire real Slack (~15 min, Socket Mode — no public URL)
 
@@ -37,28 +62,6 @@ Open-Meteo pull to prove the live path.
 @-mention it in the channel with a real question — *"can you keep an eye on Central Park and tell us if it turns bad?"*
 … *"when is alice free again?"* … *"never mind, stop watching"*. It reads the whole channel, decides when to watch,
 and words its own replies.
-
-## The CMA architecture (the point of the demo)
-
-Every Claude-Tag behavior is carried by a **real CMA primitive** (`cma_broker.py`, mirroring the
-`cwc-workshops/research-desk` pattern):
-
-- **`agents.create`** (once, via `provision.py`; idempotent — IDs live in `cma_config.json`, gitignored):
-  the system prompt and the two custom tools live **on the agent object**. Default model `claude-opus-4-8`;
-  override with `WEEKEND_WINDOW_CMA_MODEL`.
-- **One durable session per channel**, reused across turns *and broker restarts* — multiplayer + conversation memory.
-- **A memory store** mounted on every channel session — organization memory: the *model* writes rider preferences
-  to it with its file tools, and a brand-new session still knows them (verified live).
-- **The custom-tool round-trip**: `agent.custom_tool_use` → session idles at `requires_action` → the broker runs
-  geocoding + the spine and answers `user.custom_tool_result` (with backlog catch-up after a broker restart).
-- **Proactive pings go through the session**: a watch's weather change is fed in as a `[weather-watch update …]`
-  message and the **model phrases the channel ping** — so it also remembers what it told the group.
-
-The agent needs **no network access** (its environment is deny-by-default) — weather and geocoding run broker-side,
-the "keep execution host-side via custom tools" pattern.
-
-Fallback chain if CMA isn't provisioned: the Messages-API brain (`agent.py`, in-process transcript) → a regex
-intent-parser (no key at all). The spine (`weather.py` + `spine.py`) is identical in all three modes.
 
 ## Context management — how main-chat and thread context are taken in
 
@@ -121,7 +124,7 @@ arriving with **no human involved**, and the memory `Edit` from "I don't ride in
 | `slack_app.py` | real Slack Bolt (Socket Mode) adapter — wires a brain to Slack + supplies the tool handlers |
 | `run_demo.py` | runnable, credential-free proof |
 | `setup_check.py` | no-secrets doctor: verifies `.env.local`, token shapes, and Slack auth |
-| `test_spine.py` | seeded deterministic suite (SPEC §A: M2–M15) |
+| `test_spine.py` | seeded deterministic suite — SPEC §A metrics M2, M3/M4, M6/M7, M10, M15 + `describe()` ground truth (20 checks) |
 | `scenarios.py` | the SPEC §C/§D battery run live — S1–S8 with scripted weather + LLM-judged rubrics (real CMA, real model, real spine; Slack transport simulated) |
 
 The stripped concept lives in `../SPEC.md`; the verified platform facts in its appendix.

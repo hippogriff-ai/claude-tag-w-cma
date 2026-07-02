@@ -4,8 +4,8 @@ cma_broker.py — the CMA port: real Claude Managed Agents primitives (SPEC C1�
 Mirrors the cwc-workshops/research-desk pattern (provision.ts + orchestrator.ts):
 
   · provision()        — ONCE, idempotent: environments.create + agents.create (system
-                         prompt + the two custom tools live ON the agent object) +
-                         memory_stores.create. IDs persisted to cma_config.json.   (C1)
+                         prompt + the custom tools from agent.py live ON the agent
+                         object) + memory_stores.create. IDs in cma_config.json.   (C1)
   · Broker.run_turn()  — one durable session per Slack channel, reused across turns
                          and restarts (session id persisted; memory store mounted
                          at session create).                                       (C2, C4)
@@ -16,9 +16,10 @@ Mirrors the cwc-workshops/research-desk pattern (provision.ts + orchestrator.ts)
                          "[weather-watch update …]" message and the MODEL phrases
                          the channel ping (and remembers what it said).            (C5)
 
-The spine (weather.py / spine.py) is untouched: the broker answers schedule_monitor /
-cancel_monitor by driving it, exactly the "keep execution host-side via custom tools"
-pattern. Requires ANTHROPIC_API_KEY (beta header is set by the SDK automatically).
+The spine (weather.py / spine.py) is untouched: the broker answers the agent's tool
+calls (get_forecast / schedule_monitor / cancel_monitor / list_monitors) by driving
+it — the "keep execution host-side via custom tools" pattern. Requires
+ANTHROPIC_API_KEY (the beta header is set by the SDK automatically).
 """
 from __future__ import annotations
 
@@ -75,7 +76,7 @@ def _agent_tools() -> list:
                 {"name": "web_search", "enabled": False},
             ],
         },
-        *[{"type": "custom", **t} for t in TOOLS],   # schedule_monitor / cancel_monitor
+        *[{"type": "custom", **t} for t in TOOLS],   # the custom tools defined in agent.py
     ]
 
 

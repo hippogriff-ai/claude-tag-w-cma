@@ -1,6 +1,6 @@
 # Claude Tag, rebuilt on Claude Managed Agents
 
-[![seeded tests](https://img.shields.io/badge/seeded_tests-17%2F17-brightgreen)](weekend-window/app/test_spine.py)
+[![seeded tests](https://img.shields.io/badge/seeded_tests-20%2F20-brightgreen)](weekend-window/app/test_spine.py)
 [![live scenarios](https://img.shields.io/badge/live_scenarios_S1–S8-18%2F18-brightgreen)](weekend-window/app/scenarios.py)
 [![CMA](https://img.shields.io/badge/Claude_Managed_Agents-beta-b399f5)](https://platform.claude.com/docs/en/managed-agents/overview)
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](weekend-window/app/requirements.txt)
@@ -54,18 +54,19 @@ python run_demo.py                  # no credentials: watch → change → proac
 #     creates .env.local, and verifies tokens without printing them
 #   · manual: follow the runbook in weekend-window/app/README.md
 cp .env.example .env.local          # fill SLACK_BOT_TOKEN, SLACK_APP_TOKEN, ANTHROPIC_API_KEY
-pip install -r requirements.txt
-python provision.py                 # once, idempotent: CMA environment + agent + memory store
-python slack_app.py                 # the broker — @mention the bot in your channel
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python provision.py       # once, idempotent: CMA environment + agent + memory store
+.venv/bin/python slack_app.py       # START THE BOT — long-lived; run it in its own terminal
 ```
 
-## Verification (SPEC §6, all green)
+## Verification (SPEC "Passing criteria" §A–E, all green)
 
-- `python test_spine.py` — seeded deterministic core, 17/17 (classifier, change detection, fault tolerance, cancellation).
-- Live CMA primitive checks C1–C5 — 12/12 (idempotent provisioning; session reuse across broker restarts; the
-  tool round-trip; the model writing memory a fresh session recalls; model-phrased proactive pings).
-- `python scenarios.py` — the S1–S8 acceptance battery + LLM-judged rubrics, run live against real CMA: 18/18,
-  rubrics 5/5/5/4.
+| What | Result | Needs |
+|---|---|---|
+| `test_spine.py` — deterministic core (classifier, change detection, fault tolerance, cancellation, watch ground-truth) | 20/20 | nothing — seeded, CI-able |
+| CMA primitive checks **C1–C5** (idempotent provisioning; session reuse across restarts; tool round-trip; model-written memory recalled by a fresh session; model-phrased pings) | 12/12 | `ANTHROPIC_API_KEY` |
+| `scenarios.py` — acceptance battery **S1–S8** | 18/18 | real CMA + model (Slack transport simulated) |
+| Rubrics **R1–R4** (LLM-judged, so scores vary run to run; gate is ≥4) | sample run: 5/5/5/4 | real model |
 
 ## What this demo is (and isn't)
 

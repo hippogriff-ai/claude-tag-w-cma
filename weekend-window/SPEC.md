@@ -34,7 +34,7 @@ show the three things that make Claude Tag special — nothing more:
 
   | CMA primitive | Role here |
   |---|---|
-  | `agents.create` (once, versioned) | the **weekend-window** agent: system prompt + the two custom tools live on the agent object |
+  | `agents.create` (once, versioned) | the **weekend-window** agent: system prompt + the custom tools (`get_forecast` · `schedule_monitor` · `cancel_monitor` · `list_monitors`) live on the agent object |
   | `environments.create` (once) | required by sessions; **no network access needed** — weather/geocoding run broker-side |
   | `sessions.create` — **one durable session per channel** | multiplayer + conversation memory; every @mention is a `user.message` labelled with the speaker |
   | `memory_stores.create`, mounted on each channel session | organization memory — the model reads/writes notes itself; survives restarts |
@@ -138,7 +138,8 @@ gated NL parsing).
 
 ### E. Definition of Done — **met 2026-07-01**
 
-1. Section A green in CI (`python test_spine.py`, M15 added). ✅ **17/17.**
+1. Section A green in CI (`python test_spine.py`, M15 added). ✅ **17/17 at DoD; 20/20 today** (post-DoD UX
+   iterations added `describe()` ground-truth checks).
 2. **C1–C5 each proven by at least one passing scenario** — this is the teaching bar: every CMA primitive in the
    §Stack table visibly does its job. ✅ **12/12 live checks** (idempotent provisioning; session reuse across a
    broker restart + channel isolation; the `requires_action` round-trip; the model itself wrote

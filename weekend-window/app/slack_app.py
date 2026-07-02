@@ -6,17 +6,18 @@ slack_app.py — real Slack adapter (Bolt + Socket Mode).
 Same spine as the demo; the only difference is the sink posts to a real Slack
 channel and the trigger is a real @mention. Socket Mode = no public URL / ngrok.
 
-The conversational brain lives in agent.py (a real Claude agent: Messages API +
-tool use). It reads the channel, decides whether to call schedule_monitor /
-cancel_monitor, and phrases its own replies. This adapter just wires that brain to
-Slack and supplies the tool handlers that touch the spine. If ANTHROPIC_API_KEY
-isn't set (or the anthropic package is missing), it falls back to the rule-based
-`interpret()` below so the bot still runs offline.
+The conversational brain is a real CMA agent (cma_broker.py — session per channel;
+run provision.py once). The agent reads the channel, decides when to call its tools
+(get_forecast / schedule_monitor / cancel_monitor / list_monitors), and phrases its
+own replies; this adapter wires it to Slack and supplies the tool handlers that
+touch the spine. Fallbacks: no cma_config.json → the Messages-API brain (agent.py);
+no ANTHROPIC_API_KEY at all → the rule-based `interpret()` below.
 
 Setup (one-time, ~15 min): create a Slack app, enable Socket Mode (app-level token,
-scope connections:write), bot scopes app_mentions:read + chat:write + groups:history,
-subscribe to app_mention, install to the workspace, invite the bot to a private
-channel. Two riders = two accounts via you+alice@ / you+bob@ email aliases.
+scope connections:write); bot scopes app_mentions:read + chat:write + groups:history
+(private-channel history) + channels:history (public channels) + users:read (rider
+names); subscribe to app_mention, install to the workspace, invite the bot to a
+private channel. Two riders = two accounts via you+alice@ / you+bob@ email aliases.
 """
 import asyncio
 import json
@@ -163,7 +164,7 @@ def _pick_brain():
 
 def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
                    source_factory=None, cadence_s=3600):
-    """The two custom tools, closed over THIS channel/thread. In CMA mode the monitor's
+    """The custom-tool handlers, closed over THIS channel/thread. In CMA mode the monitor's
     updates are fed back INTO the session (the model phrases the ping — SPEC C5);
     in fallback modes the sink posts a templated line directly.
 
