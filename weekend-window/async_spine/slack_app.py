@@ -111,7 +111,27 @@ def phrase_update(place: str, st: WeatherState, first: bool) -> str:
 def _next_saturday_window():
     today = date.today()
     sat = today + timedelta((5 - today.weekday()) % 7)
-    return (sat.isoformat(), 12, 18)   # Sat 12:00–18:00; a real agent would infer this
+    return (sat.isoformat(), 12, 18)   # Sat 12:00–18:00 default window
+
+
+def _resolve_window(date_str=None):
+    """(YYYY-MM-DD, 12, 18) — the agent's optional date, validated; default next Saturday."""
+    if not date_str:
+        return _next_saturday_window()
+    d = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
+    today = date.today()
+    if d < today:
+        raise ValueError(f"{date_str} is in the past")
+    if (d - today).days > 15:
+        raise ValueError(f"{date_str} is beyond the ~15-day forecast horizon — "
+                         f"offer to set up a watch closer to the date instead")
+    return (d.isoformat(), 12, 18)
+
+
+def _dow(date_str: str) -> str:
+    """'2026-07-11' → 'Saturday Jul 11' (so replies can always name the concrete date)."""
+    d = datetime.strptime(date_str, "%Y-%m-%d")
+    return f"{d.strftime('%A %b')} {d.day}"
 
 
 def _pick_brain():
@@ -152,31 +172,40 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
     if source_factory is None:
         source_factory = OpenMeteoSource
 
-    async def forecast_tool(place: str) -> str:
+    async def forecast_tool(place: str, date: str = None) -> str:
+        try:
+            window = _resolve_window(date)
+        except ValueError as e:
+            return f"tool error: {e}"
         geo = await loop.run_in_executor(None, geocode, place)
         if not geo:
             return (f"Couldn't find a place called {place!r} — ask them for a fuller "
                     f"name (e.g. add the city).")
         lat, lon, resolved = geo
-        window = _next_saturday_window()
         try:
             st = await loop.run_in_executor(None, OpenMeteoSource(lat, lon).state, window)
         except Exception as e:
             return f"tool error: live forecast fetch failed ({e}) — try again in a minute."
-        return (f"{resolved} — Saturday {window[0]}, {window[1]}:00–{window[2]}:00: "
+        return (f"{resolved} — {_dow(window[0])} ({window[0]}), {window[1]}:00–{window[2]}:00: "
                 f"state={st.category}; {st.summary}")
 
-    async def schedule_tool(place: str) -> str:
+    async def schedule_tool(place: str, date: str = None) -> str:
+        try:
+            window = _resolve_window(date)
+        except ValueError as e:
+            return f"tool error: {e}"
         geo = await loop.run_in_executor(None, geocode, place)   # don't block the loop
         if not geo:
             return (f"Couldn't find a place called {place!r} — ask them for a fuller "
                     f"name (e.g. add the city).")
         lat, lon, resolved = geo
-        window = _next_saturday_window()
+
+        when = f"{_dow(window[0])} ({window[0]})"
 
         async def sink_post(st: WeatherState, first: bool):
             if brain_mode == "cma":
-                state_line = f"state={st.category}; {st.summary}; watch window Sat {window[1]}:00–{window[2]}:00"
+                state_line = (f"state={st.category}; {st.summary}; "
+                              f"watch window {when} {window[1]}:00–{window[2]}:00")
                 ping = await broker.proactive_update(
                     channel, resolved, state_line, first,
                     _make_handlers(channel, thread_ts, client, loop, brain_mode, broker,
@@ -189,18 +218,23 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
         def on_update(st, first):   # the spine's callback is sync; bridge onto the loop
             loop.create_task(sink_post(st, first))
 
+        # check hourly until the ride window ends (bounded at 16 days of checks)
+        window_end = datetime.strptime(window[0], "%Y-%m-%d").replace(hour=window[2])
+        hours_left = max(1, int((window_end - datetime.now()).total_seconds() // 3600) + 1)
+
         MGR.schedule_monitor(Monitor(
-            id=f"{channel}:{resolved}",
-            label=f"{resolved} · Sat afternoon",
+            id=f"{channel}:{resolved}:{window[0]}",
+            label=f"{resolved} · {when}",
             source=source_factory(lat, lon),
             window=window,
             cadence_s=cadence_s,                 # hourly in production
             on_update=on_update,
-            max_ticks=48,                        # bound it (safety)
+            max_ticks=min(hours_left, 24 * 16),
             log=True,                            # heartbeat per check in the server log
         ))
-        return (f"Watch created for {resolved}, Saturday {window[1]}:00–{window[2]}:00, "
-                f"checked hourly; the channel is pinged only when the outlook changes.")
+        return (f"Watch created for {resolved} on {when}, {window[1]}:00–{window[2]}:00, "
+                f"checked hourly until the ride; the channel is pinged only when the "
+                f"outlook changes.")
 
     def cancel_tool() -> str:
         n = sum(MGR.cancel_monitor(mid) for mid in MGR.active()

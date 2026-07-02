@@ -22,14 +22,17 @@ Open-Meteo pull to prove the live path.
    subscribe to the `app_mention` event; install to the workspace.
 3. Two riders = two accounts via `you+alice@gmail.com` / `you+bob@gmail.com` email aliases; make a **private channel**, invite the bot + both.
 4. `cp .env.example .env.local` and fill `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` + `ANTHROPIC_API_KEY`;
-   `pip install -r requirements.txt` (there's also a `/setup` skill that coaches the whole thing, and
-   `python setup_check.py` to verify tokens without printing them); then:
+   install deps into a venv: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
+   (There's also a `/setup` skill that coaches the whole thing, and `setup_check.py` verifies tokens
+   without printing them.) Then, from this directory:
 
 ```
-python provision.py     # once, idempotent: CMA environment + agent + memory store
-python slack_app.py     # the broker — long-lived; run in your own terminal
-python scenarios.py     # optional: the S1–S8 acceptance battery + rubric judge, live
+.venv/bin/python provision.py     # once, idempotent: CMA environment + agent + memory store
+.venv/bin/python slack_app.py     # START THE BOT — long-lived; run in your own terminal
+.venv/bin/python scenarios.py     # optional: the S1–S8 acceptance battery + rubric judge, live
 ```
+
+(Activated venv or system python with the deps installed? Plain `python slack_app.py` works too.)
 
 @-mention it in the channel with a real question — *"can you keep an eye on Central Park and tell us if it turns bad?"*
 … *"when is alice free again?"* … *"never mind, stop watching"*. It reads the whole channel, decides when to watch,

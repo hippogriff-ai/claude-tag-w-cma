@@ -49,7 +49,12 @@ SYSTEM = (
     "You can also just chat: help them weigh Saturday vs Sunday, suggest what to pack, "
     "answer questions. Keep replies short and warm — this is Slack, a sentence or two. "
     "Place names are enough; never ask for coordinates or exact times. If you genuinely "
-    "can't tell which place they mean, ask."
+    "can't tell which place they mean, ask.\n\n"
+    "Dates: ALWAYS name the concrete date when you report a forecast, window, or watch "
+    "(say 'Saturday Jul 4', never a bare 'Saturday' — riders shouldn't have to ask which "
+    "one). Forecast and watch tools default to the upcoming Saturday, but take a date "
+    "parameter — when someone asks about a different day or next weekend, pass that date "
+    "(forecasts are reliable ~15 days out; only beyond that suggest a watch instead)."
 )
 
 # The custom tools. The model decides when to call them; the broker (slack_app)
@@ -59,10 +64,11 @@ TOOLS = [
     {
         "name": "get_forecast",
         "description": (
-            "Look up a place's weekend riding outlook RIGHT NOW (real forecast for the "
-            "upcoming Saturday window). Call this whenever someone asks what the weather "
-            "is or will be like somewhere — 'what's the weather in Central Park?', 'will "
-            "it rain Saturday?'. Pass the place name people used."
+            "Look up a place's riding outlook RIGHT NOW (real forecast, 12:00–18:00 window). "
+            "Call this whenever someone asks what the weather is or will be like somewhere — "
+            "'what's the weather in Central Park?', 'will it rain Saturday?', 'how about next "
+            "weekend?'. Defaults to the upcoming Saturday; pass date for any other day "
+            "(reliable up to ~15 days out)."
         ),
         "input_schema": {
             "type": "object",
@@ -70,7 +76,12 @@ TOOLS = [
                 "place": {
                     "type": "string",
                     "description": "The place to look up, as a plain name, e.g. 'Central Park'.",
-                }
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Optional YYYY-MM-DD for a specific day (e.g. next weekend). "
+                                   "Omit for the upcoming Saturday.",
+                },
             },
             "required": ["place"],
         },
@@ -78,10 +89,11 @@ TOOLS = [
     {
         "name": "schedule_monitor",
         "description": (
-            "Start watching the weekend weather for a place and ping the channel ONLY "
-            "when the outlook changes. Call this whenever someone asks you to watch, "
-            "monitor, or keep an eye on a place. Pass the place name people used "
-            "(e.g. 'Central Park', 'George Washington Bridge') — no coordinates needed."
+            "Start watching a place's ride-day weather and ping the channel ONLY when "
+            "the outlook changes. Call this whenever someone asks you to watch, monitor, "
+            "or keep an eye on a place. Pass the place name people used (e.g. 'Central "
+            "Park') — no coordinates needed. Defaults to the upcoming Saturday; pass "
+            "date for a different ride day."
         ),
         "input_schema": {
             "type": "object",
@@ -89,7 +101,12 @@ TOOLS = [
                 "place": {
                     "type": "string",
                     "description": "The place to watch, as a plain name, e.g. 'Prospect Park'.",
-                }
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Optional YYYY-MM-DD ride day to watch. "
+                                   "Omit for the upcoming Saturday.",
+                },
             },
             "required": ["place"],
         },
