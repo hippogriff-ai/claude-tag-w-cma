@@ -1,6 +1,6 @@
 # Weekend Window — the app
 
-The essence of Claude Tag in a few hundred lines: a shared agent that, when two riders ask it to watch the weather,
+The essence of Claude Tag in a few hundred lines: a shared agent that, when the riders ask it to watch the weather,
 **posts to the channel on its own when the forecast changes** — and never repeats the same state.
 
 Three pillars, nothing else: **multiplayer** (one shared agent), **memory** (it remembers what it last told you),
@@ -45,7 +45,8 @@ intent-parser (no key at all). The spine (`weather.py` + `spine.py`) is identica
 1. Create a Slack app at api.slack.com/apps → enable **Socket Mode** → generate an app-level token (`connections:write`).
 2. Bot scopes: `app_mentions:read`, `chat:write`, `groups:history`, `users:read`, `channels:history`;
    subscribe to the `app_mention` event; install to the workspace.
-3. Two riders = two accounts via `you+alice@gmail.com` / `you+bob@gmail.com` email aliases; make a **private channel**, invite the bot + both.
+3. Extra rider identities = extra accounts via email aliases (`you+alice@gmail.com`, `you+bob@gmail.com`, …one
+   per rider); make a **private channel**, invite the bot + everyone.
 4. `cp .env.example .env.local` and fill `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` + `ANTHROPIC_API_KEY`;
    install deps into a venv: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
    (There's also a `/setup` skill that coaches the whole thing, and `setup_check.py` verifies tokens
@@ -125,6 +126,6 @@ arriving with **no human involved**, and the memory `Edit` from "I don't ride in
 | `run_demo.py` | runnable, credential-free proof |
 | `setup_check.py` | no-secrets doctor: verifies `.env.local`, token shapes, and Slack auth |
 | `test_spine.py` | seeded deterministic suite — SPEC §A metrics M2, M3/M4, M6/M7, M10, M15 + `describe()` ground truth (20 checks) |
-| `scenarios.py` | the SPEC §C/§D battery run live — S1–S8 with scripted weather + LLM-judged rubrics (real CMA, real model, real spine; Slack transport simulated) |
+| `scenarios.py` | the SPEC §C/§D battery run live — S1–S8 as a **three-rider script** (alice, bob, carol — carol recalls alice's preference she never heard, proving memory is group-shared) with scripted weather + LLM-judged rubrics (real CMA, real model, real spine; Slack transport simulated) |
 
 The stripped concept lives in `../SPEC.md`; the verified platform facts in its appendix.

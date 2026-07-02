@@ -1,7 +1,7 @@
 # Weekend Window — Essence Spec
 
-A **Claude-Tag-style teammate in a Slack channel** that two friends use to plan a weekend ride. The demo exists to
-show the three things that make Claude Tag special — nothing more:
+A **Claude-Tag-style teammate in a Slack channel** that a few friends use to plan a weekend ride. The demo exists
+to show the three things that make Claude Tag special — nothing more:
 
 1. **Multiplayer** — one shared agent both people talk to; it holds the *group's* context, not per-person silos.
 2. **Memory** — two kinds, mapped to two CMA primitives:
@@ -120,7 +120,7 @@ gated NL parsing).
 | **S4** | Re-check, no change | silence | M7 live |
 | **S5** | Storm clears | one more post (return-to-good is a change) | M7 live |
 | **S6** | *"stop"* | `cancel_monitor` called; checks cease | C3 + M15 |
-| **S7** | Bot restart | same channel → session resumed or fresh session **with the memory store**; the S-early preference still known and applied. (Active watches do **not** survive a restart — accepted; the rider re-asks. Crash-safety proofs stay cut.) | C2 + C4 |
+| **S7** | Bot restart | same channel → session resumed or fresh session **with the memory store**; the S1 preference still known — asked by a **third rider (carol)** who never heard it, proving memory is group-shared, not per-person. (Active watches do **not** survive a restart — accepted; the rider re-asks. Crash-safety proofs stay cut.) | C2 + C4 + multiplayer |
 | **S8** | Weather API error on one watch | that watch silent but alive; other watches keep posting | M10 live |
 
 ### D. Rubrics (LLM-judge + human spot-check, 1/3/5; target ≥ 4; R1–R2 release-gating)

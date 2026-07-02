@@ -69,8 +69,9 @@ It's gitignored. You create the *shape*; the user fills the *values*.
 ### 3. Channel + members
 - Make a **private channel** (e.g. `#weekend-ride`). Add the bot with **`/invite @weekend-window`** typed in the
   channel — NOT the "Add people" dialog (that's for humans; apps don't appear there).
-- Two riders = two Slack accounts via `you+alice@gmail.com` / `you+bob@gmail.com` **email aliases** (Slack treats
-  them as distinct users → real per-user attribution). One person, two browser profiles.
+- Extra rider identities = extra Slack accounts via **email aliases** (`you+alice@gmail.com`,
+  `you+bob@gmail.com`, … one per rider — Slack treats them as distinct users → real per-user attribution).
+  One person, multiple browser profiles.
 
 ### 4. Provision CMA (once, idempotent)
 - Install deps into a venv (in `weekend-window/app/`):
