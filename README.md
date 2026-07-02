@@ -33,7 +33,7 @@ into the session — details in
 
 ```
 weekend-window/
-  SPEC.md              the essence spec + passing criteria + verified platform facts (DoD: met 2026-07-01)
+  SPEC.md              the essence spec + passing criteria + verified platform facts
   app/                 the implementation (see its README for architecture + setup)
 .claude/skills/setup/  a /setup coach that walks the Slack app + token setup
 ```

@@ -91,20 +91,20 @@ gated NL parsing).
 
 ### A. Deterministic metrics (seeded fixtures, no model, CI-able — `test_spine.py`)
 
-| # | Metric | Definition | Target | Status |
-|---|---|---|---|---|
-| **M2** | Classifier reproducibility | `classify(frozen_forecast)` → identical weather-state every run | bit-identical | ✅ tested |
-| **M3** | Classifier correctness | category matches hand-labeled forecasts; **0 hazards missed** | hard gate | ✅ tested |
-| **M4** | Hazard pinpointing | flagged hour-range matches the fixture (thunderstorm 15–17) | exact bounds | ✅ tested |
-| **M6/M7** | Post-on-change, never repeat | a watch posts **iff** the state changed; identical consecutive states post nothing; `good→hazard→good` = exactly 3 posts | 0 repeats, 0 missed | ✅ tested |
-| **M10** | Fault tolerance | a failing weather check logs + retries; the watch survives; other watches unaffected | 0 uncaught exceptions | ✅ tested |
-| **M15** *(new)* | Cancellation | `cancel_monitor` stops the checks; no post after cancel | 0 posts after cancel | to add |
+| # | Metric | Definition | Target |
+|---|---|---|---|
+| **M2** | Classifier reproducibility | `classify(frozen_forecast)` → identical weather-state every run | bit-identical |
+| **M3** | Classifier correctness | category matches hand-labeled forecasts; **0 hazards missed** | hard gate |
+| **M4** | Hazard pinpointing | flagged hour-range matches the fixture (thunderstorm 15–17) | exact bounds |
+| **M6/M7** | Post-on-change, never repeat | a watch posts **iff** the state changed; identical consecutive states post nothing; `good→hazard→good` = exactly 3 posts | 0 repeats, 0 missed |
+| **M10** | Fault tolerance | a failing weather check logs + retries; the watch survives; other watches unaffected | 0 uncaught exceptions |
+| **M15** | Cancellation | `cancel_monitor` stops the checks; no post after cancel | 0 posts after cancel |
 
-### B. CMA-primitive criteria (the new core — each primitive visibly does its job, verified live)
+### B. CMA-primitive criteria (the new core — each primitive visibly does its job; verify live)
 
 | # | Primitive | Criterion (checkable) |
 |---|---|---|
-| **C1** | Agent object | Exactly **one** `agents.create` at provision time; re-running provisioning creates **no duplicate** (idempotent, IDs from config); system prompt + both custom tools live **on the agent object**, none passed per-request. |
+| **C1** | Agent object | Exactly **one** `agents.create` at provision time; re-running provisioning creates **no duplicate** (idempotent, IDs from config); system prompt + the custom tools live **on the agent object**, none passed per-request. |
 | **C2** | Session per channel | One durable session per channel, **reused across turns and across broker restarts** (session id persisted); a second channel gets a **different** session; no cross-channel context leakage. |
 | **C3** | Custom-tool round-trip | A watch request produces `agent.custom_tool_use(schedule_monitor)` → session idles at `requires_action` → broker answers `user.custom_tool_result` → the agent's reply reflects the tool result. **Zero permanently-unanswered tool calls** (backlog catch-up on broker reconnect). |
 | **C4** | Memory store | Mounted at session create. A rider's stated preference is written by **the model itself** (no host-side write), and is recalled/applied **after a bot restart with a fresh session** — the on-stage beat. |
@@ -136,20 +136,15 @@ gated NL parsing).
 - **R4 — Thread etiquette / autonomy.** `1`: hijacks the riders' logistics chatter or over-posts. `3`: mostly
   appropriate. `5`: contributes only weather, only on real change, never derails the humans.
 
-### E. Definition of Done — **met 2026-07-01**
+### E. Definition of Done
 
-1. Section A green in CI (`python test_spine.py`, M15 added). ✅ **17/17 at DoD; 20/20 today** (post-DoD UX
-   iterations added `describe()` ground-truth checks).
+1. Section A green in CI (`python test_spine.py`).
 2. **C1–C5 each proven by at least one passing scenario** — this is the teaching bar: every CMA primitive in the
-   §Stack table visibly does its job. ✅ **12/12 live checks** (idempotent provisioning; session reuse across a
-   broker restart + channel isolation; the `requires_action` round-trip; the model itself wrote
-   `/rider-preferences.md` and a fresh session recalled it; model-phrased proactive pings).
-3. S1–S8 pass live (real CMA, real model, real spine, real geocoding). ✅ **18/18 via `scenarios.py`** — scripted
-   weather (so changes happen in seconds) and a recording Slack sink that asserts thread routing. *Caveat, stated
-   plainly:* the battery drives the production handler code directly; Slack's own event transport (two humans
-   @-mentioning in a workspace) is the one link exercised only by the manual walkthrough (`python slack_app.py`,
-   already smoke-tested against the 'lemonade' workspace).
-4. Rubrics ≥ 4/5; R1 and R2 gate release. ✅ **LLM-judged R1 5, R2 5, R3 5, R4 4.**
+   §Stack table visibly does its job.
+3. S1–S8 pass live (real CMA, real model, real spine, real geocoding) — `scenarios.py` runs the battery with
+   scripted weather so changes happen in seconds; Slack's own event transport (humans @-mentioning in a
+   workspace) is exercised by the manual walkthrough (`python slack_app.py`).
+4. Rubrics ≥ 4/5; R1 and R2 gate release.
 
 ---
 
