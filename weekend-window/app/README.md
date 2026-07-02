@@ -27,8 +27,9 @@ Every Claude-Tag behavior is carried by a **real CMA primitive** (`cma_broker.py
   `claude-opus-4-8`; override with `WEEKEND_WINDOW_CMA_MODEL`.
 - **One durable session per channel** (= the conversation memory), reused across turns *and broker restarts* —
   the multiplayer pillar.
-- **A memory store** mounted on every channel session — organization memory: the *model* writes rider preferences
-  to it with its file tools, and a brand-new session still knows them (verified live).
+- **A memory store per channel** (created at first contact; mounted at session create) — organization memory:
+  the *model* writes rider preferences to it with its file tools, a brand-new session still knows them, and one
+  group's knowledge never leaks into another channel's.
 - **The custom-tool round-trip**: `agent.custom_tool_use` → session idles at `requires_action` → the broker runs
   geocoding + the spine and answers `user.custom_tool_result` (with backlog catch-up after a broker restart).
 - **Proactive pings go through the session**: a watch's weather change is fed in as a `[weather-watch update …]`

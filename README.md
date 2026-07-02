@@ -1,6 +1,6 @@
 # Claude Tag, rebuilt on Claude Managed Agents
 
-[![seeded tests](https://img.shields.io/badge/seeded_tests-20%2F20-brightgreen)](weekend-window/app/test_spine.py)
+[![seeded tests](https://github.com/hippogriff-ai/claude-tag-w-cma/actions/workflows/tests.yml/badge.svg)](https://github.com/hippogriff-ai/claude-tag-w-cma/actions/workflows/tests.yml)
 [![live scenarios](https://img.shields.io/badge/live_scenarios_S1–S8-18%2F18-brightgreen)](weekend-window/app/scenarios.py)
 [![CMA](https://img.shields.io/badge/Claude_Managed_Agents-beta-b399f5)](https://platform.claude.com/docs/en/managed-agents/overview)
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](weekend-window/app/requirements.txt)
@@ -21,8 +21,8 @@ Three pillars, each carried by a named CMA primitive:
 | Claude Tag behavior | CMA primitive here |
 |---|---|
 | **Multiplayer** — one shared agent everyone talks to | one durable **session per channel** (`sessions.create`, reused across turns *and* restarts) |
-| **Memory** — conversation context + durable group knowledge | the session (conversation) + a **memory store** the model reads/writes itself (survives restarts) |
-| **Async + proactive** — watch requested in plain language, pings unprompted on change | **custom tools** `schedule_monitor`/`cancel_monitor` answered by a broker via the `agent.custom_tool_use → requires_action → user.custom_tool_result` round-trip; changes are fed back into the session so the **model phrases the ping** |
+| **Memory** — conversation context + durable group knowledge | the session (conversation) + a **memory store per channel** the model reads/writes itself — the group's knowledge survives restarts and never leaks across channels |
+| **Async + proactive** — watch requested in plain language, pings unprompted on change | **custom tools** (`get_forecast` · `schedule_monitor` · `cancel_monitor` · `list_monitors`) answered by a broker via the `agent.custom_tool_use → requires_action → user.custom_tool_result` round-trip; changes are fed back into the session so the **model phrases the ping** |
 
 The agent is created **once** (`agents.create`, versioned; no network access — weather and geocoding run
 broker-side). On every @mention the broker pulls the conversation the agent hasn't seen (main channel + thread)

@@ -130,19 +130,7 @@ async def provision(client) -> dict:
                   f"(tools: {sorted(local_tools)}); {n} session(s) retired")
     print(f"   agent        {cfg['agent_id']} (model {CMA_MODEL})")
 
-    if not cfg.get("memory_store_id"):
-        store = await client.beta.memory_stores.create(
-            name="weekend-window-memory",
-            description=(
-                "The riding group's durable memory: rider preferences (e.g. temperature limits), "
-                "standing constraints, and notes worth keeping across conversations. One small "
-                "file per topic. Check before answering questions that a stored preference would change."
-            ),
-        )
-        cfg["memory_store_id"] = store.id
-        save_config(cfg)
-    print(f"   memory store {cfg['memory_store_id']}")
-
+    print("   memory stores: one per channel, created at first contact (see Broker._ensure_store)")
     return cfg
 
 
@@ -160,6 +148,30 @@ class Broker:
     def _lock(self, channel: str) -> asyncio.Lock:
         return self._locks.setdefault(channel, asyncio.Lock())
 
+    async def _ensure_store(self, channel: str) -> str:
+        """One memory store PER CHANNEL (the channel = the group = the 'org'): each group's
+        durable knowledge is isolated from every other channel's. Created lazily at first
+        contact; a memory store can only be mounted at session create, so it must exist
+        before the channel's first session."""
+        cfg = load_config()
+        stores = cfg.setdefault("memory_stores", {})
+        store_id = stores.get(channel)
+        if store_id:
+            return store_id
+        store = await self._client.beta.memory_stores.create(
+            name=f"weekend-window-memory-{channel}",
+            description=(
+                "This channel's riding-group memory: rider preferences (e.g. temperature "
+                "limits), standing constraints, and notes worth keeping across conversations. "
+                "One small file per topic. Check before answering questions a stored "
+                "preference would change."
+            ),
+        )
+        stores[channel] = store.id
+        save_config(cfg)
+        print(f"   memory store for {channel}: {store.id}")
+        return store.id
+
     async def ensure_session(self, channel: str) -> str:
         """One durable session per channel (C2), persisted across broker restarts."""
         cfg = load_config()
@@ -176,19 +188,21 @@ class Broker:
             except Exception:
                 pass   # fall through: create a fresh session (memory store carries continuity)
 
+        store_id = await self._ensure_store(channel)
         session = await self._client.beta.sessions.create(
-            agent=cfg["agent_id"],
+            agent=load_config()["agent_id"],
             environment_id=cfg["environment_id"],
             title=f"weekend-window · {channel}",
             resources=[{
                 "type": "memory_store",
-                "memory_store_id": cfg["memory_store_id"],
+                "memory_store_id": store_id,
                 "access": "read_write",
                 "instructions": "This channel's durable group memory. Check it before answering "
                                 "questions a stored preference would change; write lasting facts here.",
             }],
         )
-        sessions[channel] = session.id
+        cfg = load_config()   # reload: _ensure_store may have written the config
+        cfg.setdefault("sessions", {})[channel] = session.id
         save_config(cfg)
         self._caught_up.add(session.id)
         print(f"   session for {channel}: {session.id}")

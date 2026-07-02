@@ -105,15 +105,19 @@ async def run_scenarios(client):
         print(f"    [{text[:60]}…] → {reply[:110]}")
         return reply
 
-    # fresh stage: clear any prior session for this channel + empty the memory store
+    # fresh stage: clear any prior session for this channel + empty ITS memory store
+    # (stores are per channel — the battery only ever touches C_SCEN's)
     cfg = cma_broker.load_config()
     cfg.get("sessions", {}).pop(CH, None)
     cma_broker.save_config(cfg)
-    page = await client.beta.memory_stores.memories.list(cfg["memory_store_id"])
-    for m in list(getattr(page, "data", []) or []):
-        if getattr(m, "type", "") == "memory":
-            await client.beta.memory_stores.memories.delete(m.id, memory_store_id=cfg["memory_store_id"])
-    print("  (stage reset: fresh session, empty memory store)")
+    store_id = cfg.get("memory_stores", {}).get(CH)
+    if store_id:
+        page = await client.beta.memory_stores.memories.list(store_id)
+        for m in list(getattr(page, "data", []) or []):
+            if getattr(m, "type", "") == "memory":
+                await client.beta.memory_stores.memories.delete(m.id, memory_store_id=store_id)
+    print("  (stage reset: fresh session, channel store emptied)" if store_id
+          else "  (stage reset: fresh session; channel store will be created at first contact)")
 
     print("\nS1 — multiplayer availability → mutual window")
     await turn("T_ROOT", "alice: I'm only free Saturday afternoon this weekend. "

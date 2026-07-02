@@ -7,7 +7,8 @@ to show the three things that make Claude Tag special — nothing more:
 2. **Memory** — two kinds, mapped to two CMA primitives:
    - *conversation memory* — the running channel context ("Alice said Saturday afternoon") = the **CMA session**;
    - *organization memory* — durable group knowledge that survives restarts ("Bob won't ride below 40°F") = a
-     **CMA memory store** the model reads/writes itself. No predefined schema; the model owns what it keeps.
+     per-channel **CMA memory store** the model reads/writes itself (the channel *is* the org; one group's
+     knowledge never leaks into another's). No predefined schema; the model owns what it keeps.
 3. **Async + proactive** — you ask it to watch the weather, walk away, and it **pings the channel on its own when
    the forecast changes.** (This is the hard part and the whole point.)
 
@@ -36,14 +37,14 @@ to show the three things that make Claude Tag special — nothing more:
   |---|---|
   | `agents.create` (once, versioned) | the **weekend-window** agent: system prompt + the custom tools (`get_forecast` · `schedule_monitor` · `cancel_monitor` · `list_monitors`) live on the agent object |
   | `environments.create` (once) | required by sessions; **no network access needed** — weather/geocoding run broker-side |
-  | `sessions.create` — **one durable session per channel** | multiplayer + conversation memory; every @mention is a `user.message` labelled with the speaker |
-  | `memory_stores.create`, mounted on each channel session | organization memory — the model reads/writes notes itself; survives restarts |
-  | custom-tool round-trip (`agent.custom_tool_use` → idle at `requires_action` → `user.custom_tool_result`) | how the agent reaches the outside world: the **broker** answers its tool calls |
+  | `sessions.create` — **one durable session per channel** | multiplayer + conversation memory; every @mention arrives as a `user.message` labelled per speaker, prefixed with the **catch-up pull** (unseen main-channel + thread messages) |
+  | `memory_stores.create` — **one store per channel**, created at first contact, mounted at session create | organization memory — each group's durable knowledge, isolated from other channels; the model reads/writes notes itself; survives restarts |
+  | custom-tool round-trip (`agent.custom_tool_use` → idle at `requires_action` → `user.custom_tool_result`) | how the agent reaches the outside world: the **broker** answers `get_forecast` (live outlook, any date ≤15 days), `schedule_monitor`/`cancel_monitor` (the watches), `list_monitors` (ground-truth watch status) |
 
 - **The broker** (our long-lived Slack process) is the orchestrator, exactly the research-desk watcher pattern: it
-  relays @mentions into the session, holds the session's event stream (reconnect + backlog catch-up), answers
-  `schedule_monitor` / `cancel_monitor` tool calls by driving the local async spine, and posts `agent.message`
-  text back to the thread.
+  relays @mentions into the session (with the catch-up pull), holds the session's event stream (reconnect +
+  backlog catch-up), answers the agent's tool calls by driving geocoding, Open-Meteo, and the local async spine,
+  and posts `agent.message` text back to the thread.
 - **Weather** — Open-Meteo (free, no key).
 - **Async** — `schedule_monitor(location, cadence, until)` / `cancel_monitor` — custom tools the agent calls **on
   request**; the broker's timer (the async spine) is just the clockwork behind them. (Native CMA scheduled
