@@ -24,13 +24,9 @@ Three pillars, each carried by a named CMA primitive:
 | **Memory** — conversation context + durable group knowledge | the session (conversation) + a **memory store** the model reads/writes itself (survives restarts) |
 | **Async + proactive** — watch requested in plain language, pings unprompted on change | **custom tools** `schedule_monitor`/`cancel_monitor` answered by a broker via the `agent.custom_tool_use → requires_action → user.custom_tool_result` round-trip; changes are fed back into the session so the **model phrases the ping** |
 
-The agent object itself is created **once** (`agents.create`, versioned) with the system prompt and tools on it,
-in an environment with **no network access** — weather and geocoding run broker-side, the "keep execution
-host-side via custom tools" pattern.
-
-On every @mention the broker performs a **conversation catch-up pull** — the unseen main-channel messages plus,
-for thread mentions, the unseen thread messages — so the agent has the group's full context without being a
-listener on every message. How that works (and how it differs from stock Claude Tag) is documented in
+The agent is created **once** (`agents.create`, versioned; no network access — weather and geocoding run
+broker-side). On every @mention the broker pulls the conversation the agent hasn't seen (main channel + thread)
+into the session — details in
 [`weekend-window/app/README.md` → Context management](weekend-window/app/README.md#context-management--how-main-chat-and-thread-context-are-taken-in).
 
 ## Layout
@@ -48,28 +44,17 @@ weekend-window/
 cd weekend-window/app
 python run_demo.py                  # no credentials: watch → change → proactive post, in seconds
 
-# the real thing — needs a Slack app + tokens. Two ways to get set up:
-#   · guided: open this repo in Claude Code and type /setup — the repo ships a
-#     setup-coach skill (.claude/skills/setup/) that walks every Slack step,
-#     creates .env.local, and verifies tokens without printing them
-#   · manual: follow the runbook in weekend-window/app/README.md
+# the real thing — needs a Slack app + tokens: type /setup in Claude Code for a
+# guided walkthrough (the repo ships the skill), or follow app/README.md
 cp .env.example .env.local          # fill SLACK_BOT_TOKEN, SLACK_APP_TOKEN, ANTHROPIC_API_KEY
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python provision.py       # once, idempotent: CMA environment + agent + memory store
 .venv/bin/python slack_app.py       # START THE BOT — long-lived; run it in its own terminal
 ```
 
-## Verification (SPEC "Passing criteria" §A–E, all green)
-
-| What | Result | Needs |
-|---|---|---|
-| `test_spine.py` — deterministic core (classifier, change detection, fault tolerance, cancellation, watch ground-truth) | 20/20 | nothing — seeded, CI-able |
-| CMA primitive checks **C1–C5** (idempotent provisioning; session reuse across restarts; tool round-trip; model-written memory recalled by a fresh session; model-phrased pings) | 12/12 | `ANTHROPIC_API_KEY` |
-| `scenarios.py` — acceptance battery **S1–S8** | 18/18 | real CMA + model (Slack transport simulated) |
-| Rubrics **R1–R4** (LLM-judged, so scores vary run to run; gate is ≥4) | sample run: 5/5/5/4 | real model |
-
 ## What this demo is (and isn't)
 
 It exists to show the **essence of Claude Tag on CMA primitives** with the simplest possible domain (free,
 keyless weather data). Deliberately cut: per-location subagent fan-out, session-per-thread, crash-safety proofs,
-and any bespoke UI — `weekend-window/SPEC.md` is the source of truth for scope and criteria.
+and any bespoke UI. [`weekend-window/SPEC.md`](weekend-window/SPEC.md) is the source of truth for scope, the
+passing criteria, and the verification results the badges point to.
