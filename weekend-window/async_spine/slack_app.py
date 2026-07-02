@@ -197,6 +197,7 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
             cadence_s=cadence_s,                 # hourly in production
             on_update=on_update,
             max_ticks=48,                        # bound it (safety)
+            log=True,                            # heartbeat per check in the server log
         ))
         return (f"Watch created for {resolved}, Saturday {window[1]}:00–{window[2]}:00, "
                 f"checked hourly; the channel is pinged only when the outlook changes.")

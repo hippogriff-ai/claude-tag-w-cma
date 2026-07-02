@@ -27,6 +27,8 @@ class Monitor:
     cadence_s: float
     on_update: Callable              # (WeatherState, first: bool) -> None
     max_ticks: Optional[int] = None  # stop after N checks (bounds the demo)
+    log: bool = False                # heartbeat line per tick (production observability;
+                                     # off in tests to keep their output clean)
 
 
 class MonitorManager:
@@ -40,6 +42,9 @@ class MonitorManager:
         """Stand up a recurring check. Returns the monitor id."""
         if m.id in self._tasks:
             self.cancel_monitor(m.id)
+        if m.log:
+            print(f"   ▶ watch started: {m.label} — every {m.cadence_s/60:g} min"
+                  + (f", ≤{m.max_ticks} checks" if m.max_ticks else ""))
         self._tasks[m.id] = asyncio.ensure_future(self._run(m))
         return m.id
 
@@ -48,6 +53,7 @@ class MonitorManager:
         self._last.pop(monitor_id, None)
         if t and not t.done():
             t.cancel()
+            print(f"   ■ watch cancelled: {monitor_id}")
             return True
         return False
 
@@ -71,7 +77,11 @@ class MonitorManager:
 
                 if state is not None:
                     last = self._last.get(m.id)
-                    if state != last:             # ← the essence: post ONLY on change
+                    changed = state != last
+                    if m.log:
+                        print(f"   ⏱ {m.label}: checked → {state.category}"
+                              + (" — CHANGED, notifying" if changed else " — no change, staying quiet"))
+                    if changed:                   # ← the essence: post ONLY on change
                         first = last is None
                         self._last[m.id] = state
                         m.on_update(state, first)
