@@ -22,6 +22,11 @@ The agent object itself is created **once** (`agents.create`, versioned) with th
 in an environment with **no network access** — weather and geocoding run broker-side, the "keep execution
 host-side via custom tools" pattern.
 
+On every @mention the broker performs a **conversation catch-up pull** — the unseen main-channel messages plus,
+for thread mentions, the unseen thread messages — so the agent has the group's full context without being a
+listener on every message. How that works (and how it differs from stock Claude Tag) is documented in
+[`weekend-window/async_spine/README.md` → Context management](weekend-window/async_spine/README.md#context-management--how-main-chat-and-thread-context-are-taken-in).
+
 ## Layout
 
 ```

@@ -57,6 +57,49 @@ the "keep execution host-side via custom tools" pattern.
 Fallback chain if CMA isn't provisioned: the Messages-API brain (`agent.py`, in-process transcript) → a regex
 intent-parser (no key at all). The spine (`weather.py` + `spine.py`) is identical in all three modes.
 
+## Context management — how main-chat and thread context are taken in
+
+The agent only *hears* anything when it's @-mentioned. So on every mention the broker performs a
+**conversation catch-up pull** before relaying the turn, and composes one message for the session:
+
+```
+[in the main channel since your last look]        ← unseen CHANNEL-ROOT messages (last 20)
+U0BEH8URSE9: hey hey, excited to join, you wanna go for 30mile ride this sunday @U03EM54G5K2
+U03EM54G5K2: sure thing! I have time Sun 8am to 2pm
+U03EA18E0UR: Maybe sun 9-11 1-3 or sat night
+U03EM54G5K2: how about GW bridge?
+[in this thread]                                  ← unseen THREAD messages (last 50, thread mentions only)
+U03EM54G5K2: how about GW bridge?
+U0BEH8URSE9: ok
+[tagging you] U0BEH8URSE9: what's the weather     ← the actual mention
+```
+
+(A real composed turn from a live session — with the `users:read` scope granted, the `U…` ids become
+display names, which is also what makes the model's memory notes name-keyed and legible.)
+
+The rules, and the reasoning behind them:
+
+- **Both scopes, always.** Claude Tag's documented pull is last-20 channel messages on a channel mention and
+  last-50 thread messages on a thread mention (*thread-only* in threads). We deliberately do **more** on thread
+  mentions — root catch-up **plus** the thread — because in this demo availability is discussed in the main chat
+  while logistics live in threads; a thread-tagged agent blind to the root would miss half the group's context.
+- **Only what's new — per-channel and per-thread cursors.** Claude Tag is stateless per invocation, so it re-reads
+  history every time. Our CMA session is **stateful** (it remembers every prior turn), so re-sending history would
+  duplicate context and burn tokens. The broker persists a cursor per channel root and per thread
+  (`context_cursors` in `cma_config.json`) and relays only messages the session hasn't seen.
+- **Filtered out:** the bot's own posts (already in the session as agent turns), other threads' replies when
+  composing the root view, and the triggering mention itself (sent separately after `[tagging you]`).
+- **Untagged chatter is heard late, not never:** messages sent between mentions arrive as catch-up on the *next*
+  mention. The agent is not a listener on every message — only `app_mention` events wake it (by design: that's the
+  Tag invocation model, and it keeps humans' chatter out of the model until relevant).
+- **Slack markup is cleaned:** `<@U…>` mentions become people's names (the bot's own tag is dropped), so the model
+  reads natural conversation.
+
+The same catch-up feeds **memory**: the model decides what's durable and writes it to the mounted store itself —
+e.g. a rider saying *"I don't ride in the rain"* produced an `Edit` of `/rider-preferences.md` in the session
+transcript, and a brand-new session (after a restart) still knows it. The identity it memorizes is the speaker
+label it saw — one more reason to grant `users:read`.
+
 ## Files
 
 | File | What |
