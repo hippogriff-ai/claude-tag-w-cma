@@ -68,13 +68,12 @@ bespoke web UI. Add depth only if the demo actually needs it.
 
 ## Build order
 
-1. **The async spine** (`app/`) — recurring watch + change detection + proactive notify. ✅ built
+1. **The async spine** (`app/`) — recurring watch + change detection + proactive notify
    (runnable credential-free: `python run_demo.py`; seeded asserts: `python test_spine.py`).
-2. Wire **real Slack** (Bolt + Socket Mode). ✅ built.
+2. Wire **real Slack** (Bolt + Socket Mode).
 3. Make it **conversational** (a real model decides to call `schedule_monitor` from a natural request, attributes
-   memory per speaker, composes replies). ✅ built on the plain Messages API (`agent.py`) and verified live — this
-   proved the behavior, but it is a **stepping stone, not the destination**: it uses none of the CMA primitives.
-   It stays as the offline fallback.
+   memory per speaker, composes replies) — first on the plain Messages API (`agent.py`), a **stepping stone, not
+   the destination**: it uses none of the CMA primitives and stays as the offline fallback.
 4. **Port the seam onto CMA** (the actual point): `provision.py` (environment + agent + memory store, once, IDs
    saved to config) → session-per-channel → `slack_app.py` becomes the broker/orchestrator answering the custom
    tools → proactive pings routed through the session so the model phrases them. Spine, tool schemas, system
