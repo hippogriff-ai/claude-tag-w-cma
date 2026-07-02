@@ -67,7 +67,13 @@ and words its own replies.
 ## Context management — how main-chat and thread context are taken in
 
 The agent only *hears* anything when it's @-mentioned. So on every mention the broker performs a
-**conversation catch-up pull** before relaying the turn, and composes one message for the session:
+**conversation catch-up pull** before relaying the turn. Here's a live run — availability chatter in the main
+channel, the ask happening inside the 🧵 "how about GW bridge?" thread:
+
+![What the riders saw in Slack: channel availability chatter, then a thread where the agent answers a forecast ask, stands up a watch, pings unprompted, and memorizes a preference](../../docs/demo-slack.png)
+
+The broker composed that thread mention into one message for the session — main-channel catch-up first, then the
+thread, then the tagged ask:
 
 ```
 [in the main channel since your last look]        ← unseen CHANNEL-ROOT messages (last 20)
