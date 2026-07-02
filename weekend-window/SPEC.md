@@ -99,6 +99,7 @@ gated NL parsing).
 | **M6/M7** | Post-on-change, never repeat | a watch posts **iff** the state changed; identical consecutive states post nothing; `good→hazard→good` = exactly 3 posts | 0 repeats, 0 missed |
 | **M10** | Fault tolerance | a failing weather check logs + retries; the watch survives; other watches unaffected | 0 uncaught exceptions |
 | **M15** | Cancellation | `cancel_monitor` stops the checks; no post after cancel | 0 posts after cancel |
+| **M16** | Rehydration seed | a watch re-stood after a restart, seeded with its last-told state, posts **only if the weather changed** while the broker was down — never re-announces an unchanged outlook | 0 repeats, 0 missed |
 
 ### B. CMA-primitive criteria (the new core — each primitive visibly does its job; verify live)
 
@@ -120,7 +121,7 @@ gated NL parsing).
 | **S4** | Re-check, no change | silence | M7 live |
 | **S5** | Storm clears | one more post (return-to-good is a change) | M7 live |
 | **S6** | *"stop"* | `cancel_monitor` called; checks cease | C3 + M15 |
-| **S7** | Bot restart | same channel → session resumed or fresh session **with the memory store**; the S1 preference still known — asked by a **third rider (carol)** who never heard it, proving memory is group-shared, not per-person. (Active watches do **not** survive a restart — accepted; the rider re-asks. Crash-safety proofs stay cut.) | C2 + C4 + multiplayer |
+| **S7** | Bot restart | same channel → session resumed or fresh session **with the memory store**; the S1 preference still known — asked by a **third rider (carol)** who never heard it, proving memory is group-shared, not per-person. **Active watches survive too**: specs are persisted and rehydrated on start, seeded with the last-told state (M16), so nothing is re-announced unchanged. (Exactly-once under crash-between-post-and-persist stays cut.) | C2 + C4 + M16 + multiplayer |
 | **S8** | Weather API error on one watch | that watch silent but alive; other watches keep posting | M10 live |
 
 ### D. Rubrics (LLM-judge + human spot-check, 1/3/5; target ≥ 4; R1–R2 release-gating)
@@ -162,9 +163,26 @@ on mention: last 20 channel messages (channel mention) / last 50 thread messages
 (under the `managed-agents-2026-04-01` beta header). A memory store attaches at **session-create only** — no
 hot-swap onto a running session. **No session fork** (that's an Agent-SDK concept); context editing is
 Messages-API-only. `user.message` has no thread field — an in-thread @mention routes to the coordinator, so
-per-thread addressing is **broker-emulated**, not native delivery. **Scheduled Deployments don't fit this demo**:
-a scheduled run starts a fresh session with no connected broker, so nothing can answer the agent's custom tools
-or post to Slack — hence the broker-side timer behind `schedule_monitor`.
+per-thread addressing is **broker-emulated**, not native delivery.
+
+**Scheduled Deployments — a finding to pressure-test, not a verdict.** Deployments work well for
+*self-contained* scheduled runs (daily briefs and the like). v1 skips them for the watch loop for a precise
+reason: a scheduled firing creates a **fresh session with no connected broker**, so nothing would answer the
+agent's custom tools or carry its output to Slack — hence the broker-side timer behind `schedule_monitor`.
+But note what the constraint actually is: the broker must be **attached** to the fired session, not be its
+*creator*. That opens a fully CMA-native v2 for the async pillar:
+
+1. `schedule_monitor` **creates a Deployment** (hourly cron until the ride) instead of an in-process timer;
+2. each firing's session **mounts the channel memory store** and reads *"what did I last tell them"* from it —
+   change detection via memory, so the firing being a fresh session stops mattering;
+3. a **webhook-woken broker** (`session.status_run_started`) attaches to the fired session's stream, answers its
+   tools, and posts to Slack.
+
+The long-horizon timer then lives on Anthropic's durable infrastructure — firings recorded in
+`deployment_runs`, auto-pause on non-recoverable failure, surviving broker downtime entirely. The trade-off:
+webhooks need a public HTTPS endpoint, giving up Socket Mode's no-public-URL property. v1 instead persists watch
+specs locally and rehydrates them on start (S7/M16) — durable enough for the demo, one process short of durable
+infrastructure.
 
 **Slack**: Socket Mode needs no public URL. `chat.postMessage` has **no idempotency key** (a crash between post
 and state-write can drop/duplicate one update — accepted). A bot can't DM two *other* humans → use a private

@@ -143,6 +143,27 @@ def test_describe():
     check("empty after cancel", after == [])
 
 
+def test_seed():
+    print("rehydration seed — a restarted watch doesn't re-announce an unchanged state (SPEC M16):")
+    good = WeatherState("good", (), "")
+    storm = WeatherState("hazard", (("thunderstorm", 15, 17),), "")
+
+    def run(seed, states):
+        posts = []
+
+        async def go():
+            mgr = MonitorManager()
+            mid = mgr.schedule_monitor(Monitor("s", "s", ScriptedSource(states), W, 0.001,
+                                               on_update=lambda st, first: posts.append(st.category)))
+            mgr.seed_last(mid, seed)
+            await mgr.join()
+        asyncio.run(go())
+        return posts
+
+    check("seeded good + still good → SILENT", run(good, [good, good]) == [])
+    check("seeded good + turns to storm → posts the change", run(good, [storm]) == ["hazard"])
+
+
 def test_interpret():
     print("interpret() parsing (natural asks → intent + place):")
     check("watch <place>", slack_app.interpret("<@U1> watch Central Park and ping us")
@@ -155,7 +176,7 @@ def test_interpret():
 
 if __name__ == "__main__":
     for t in (test_classify, test_reproducible, test_change_detection, test_fault_tolerance,
-              test_cancellation, test_describe, test_interpret):
+              test_cancellation, test_describe, test_seed, test_interpret):
         t()
     print("-" * 48)
     print("  ALL PASS ✓" if not FAILS else f"  {len(FAILS)} FAILED: " + ", ".join(FAILS))

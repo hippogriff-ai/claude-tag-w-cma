@@ -62,6 +62,12 @@ class MonitorManager:
             return True
         return False
 
+    def seed_last(self, monitor_id: str, state) -> None:
+        """Pre-seed a monitor's last-posted state (watch rehydration after a broker
+        restart): the first re-check then posts only if the weather actually changed
+        since what was last told, instead of re-announcing an unchanged outlook."""
+        self._last[monitor_id] = state
+
     def active(self):
         return list(self._tasks.keys())
 

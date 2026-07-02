@@ -106,10 +106,12 @@ async def run_scenarios(client):
         return reply
 
     # fresh stage: clear any prior session for this channel + empty ITS memory store
-    # (stores are per channel — the battery only ever touches C_SCEN's)
+    # (stores are per channel — the battery only ever touches C_SCEN's), and prune any
+    # persisted C_SCEN watches so they can't rehydrate into the real broker later
     cfg = cma_broker.load_config()
     cfg.get("sessions", {}).pop(CH, None)
     cma_broker.save_config(cfg)
+    slack_app._unpersist_watches(CH)
     store_id = cfg.get("memory_stores", {}).get(CH)
     if store_id:
         page = await client.beta.memory_stores.memories.list(store_id)

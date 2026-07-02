@@ -45,7 +45,8 @@ SYSTEM = (
     "on your OWN if the outlook changes (e.g. clear turns to thunderstorm), so they don't "
     "have to keep asking. When someone says stop / cancel / never mind, call cancel_monitor. "
     "When someone asks what you're watching or whether a watch is still on, call list_monitors "
-    "first — it's the ground truth (watches don't survive restarts, so don't trust memory alone).\n\n"
+    "first — it's the ground truth (a watch may have been cancelled by someone else or expired; "
+    "don't trust conversation memory alone).\n\n"
     "You can also just chat: help them weigh Saturday vs Sunday, suggest what to pack, "
     "answer questions. Keep replies short and warm — this is Slack, a sentence or two. "
     "Place names are enough; never ask for coordinates or exact times. If you genuinely "
@@ -125,9 +126,9 @@ TOOLS = [
             "Ground truth about which weather watches are ACTUALLY running right now "
             "(place, cadence, checks so far, last observed state). Call this BEFORE "
             "answering 'what are you watching?' / 'is the watch still on?' — never "
-            "answer from conversation memory alone: watches do not survive a bot "
-            "restart, so a watch you remember scheduling may no longer be running. "
-            "If it's gone, say so and offer to re-create it."
+            "answer from conversation memory alone: a watch you remember may have been "
+            "cancelled by another rider or expired after its ride day. If it's gone, "
+            "say so and offer to create a new one."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },

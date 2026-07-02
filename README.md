@@ -1,7 +1,7 @@
 # Claude Tag, rebuilt on Claude Managed Agents
 
 [![seeded tests](https://github.com/hippogriff-ai/claude-tag-w-cma/actions/workflows/tests.yml/badge.svg)](https://github.com/hippogriff-ai/claude-tag-w-cma/actions/workflows/tests.yml)
-[![live scenarios](https://img.shields.io/badge/live_scenarios_S1–S8-18%2F18-brightgreen)](weekend-window/app/scenarios.py)
+[![live scenarios](https://img.shields.io/badge/live_scenarios_S1–S8-runs_logged-blue)](docs/RUNS.md)
 [![CMA](https://img.shields.io/badge/Claude_Managed_Agents-beta-b399f5)](https://platform.claude.com/docs/en/managed-agents/overview)
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](weekend-window/app/requirements.txt)
 
@@ -22,7 +22,7 @@ Three pillars, each carried by a named CMA primitive:
 |---|---|
 | **Multiplayer** — one shared agent everyone talks to | one durable **session per channel** (`sessions.create`, reused across turns *and* restarts) |
 | **Memory** — conversation context + durable group knowledge | the session (conversation) + a **memory store per channel** the model reads/writes itself — the group's knowledge survives restarts and never leaks across channels |
-| **Async + proactive** — watch requested in plain language, pings unprompted on change | **custom tools** (`get_forecast` · `schedule_monitor` · `cancel_monitor` · `list_monitors`) answered by a broker via the `agent.custom_tool_use → requires_action → user.custom_tool_result` round-trip; changes are fed back into the session so the **model phrases the ping** |
+| **Async + proactive** — watch requested in plain language, pings unprompted on change | **custom tools** (`get_forecast` · `schedule_monitor` · `cancel_monitor` · `list_monitors`) answered by a broker via the `agent.custom_tool_use → requires_action → user.custom_tool_result` round-trip; changes are fed back into the session so the **model phrases the ping**; watches are persisted and **survive broker restarts** |
 
 The agent is created **once** (`agents.create`, versioned; no network access — weather and geocoding run
 broker-side). On every @mention the broker pulls the conversation the agent hasn't seen (main channel + thread)

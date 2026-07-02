@@ -200,55 +200,25 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
             return (f"Couldn't find a place called {place!r} — ask them for a fuller "
                     f"name (e.g. add the city).")
         lat, lon, resolved = geo
-
-        when = f"{_dow(window[0])} ({window[0]})"
-
-        async def sink_post(st: WeatherState, first: bool):
-            if brain_mode == "cma":
-                state_line = (f"state={st.category}; {st.summary}; "
-                              f"watch window {when} {window[1]}:00–{window[2]}:00")
-                ping = await broker.proactive_update(
-                    channel, resolved, state_line, first,
-                    _make_handlers(channel, thread_ts, client, loop, brain_mode, broker,
-                                   source_factory, cadence_s))
-                await client.chat_postMessage(channel=channel, thread_ts=thread_ts, text=ping)
-            else:
-                await client.chat_postMessage(channel=channel, thread_ts=thread_ts,
-                                              text=phrase_update(resolved, st, first))
-
-        def on_update(st, first):   # the spine's callback is sync; bridge onto the loop
-            loop.create_task(sink_post(st, first))
-
-        # check hourly until the ride window ends (bounded at 16 days of checks)
-        window_end = datetime.strptime(window[0], "%Y-%m-%d").replace(hour=window[2])
-        hours_left = max(1, int((window_end - datetime.now()).total_seconds() // 3600) + 1)
-
-        MGR.schedule_monitor(Monitor(
-            id=f"{channel}:{resolved}:{window[0]}",
-            label=f"{resolved} · {when}",
-            source=source_factory(lat, lon),
-            window=window,
-            cadence_s=cadence_s,                 # hourly in production
-            on_update=on_update,
-            max_ticks=min(hours_left, 24 * 16),
-            log=True,                            # heartbeat per check in the server log
-        ))
+        when = _start_watch(channel, thread_ts, client, loop, brain_mode, broker,
+                            source_factory, cadence_s, resolved, lat, lon, window)
         return (f"Watch created for {resolved} on {when}, {window[1]}:00–{window[2]}:00, "
                 f"checked hourly until the ride; the channel is pinged only when the "
-                f"outlook changes.")
+                f"outlook changes. (Watches survive bot restarts.)")
 
     def cancel_tool() -> str:
         n = sum(MGR.cancel_monitor(mid) for mid in MGR.active()
                 if mid.startswith(channel + ":"))
+        _unpersist_watches(channel)
         return (f"Stopped {n} watch(es) for this channel." if n
                 else "There were no active watches here to stop.")
 
     def list_tool() -> str:
         rows = [d for d in MGR.describe() if d["id"].startswith(channel + ":")]
         if not rows:
-            return ("No watches are currently running for this channel. (Watches don't "
-                    "survive a bot restart — if one was set up earlier, it's gone; offer "
-                    "to re-create it.)")
+            return ("No watches are currently running for this channel. If someone believes "
+                    "one was set up, it may have been cancelled or its ride day has passed — "
+                    "offer to create a new one.")
         lines = []
         for d in rows:
             ago = ("not checked yet" if d["seconds_since_check"] is None
@@ -260,6 +230,107 @@ def _make_handlers(channel, thread_ts, client, loop, brain_mode, broker=None,
 
     return {"get_forecast": forecast_tool, "schedule_monitor": schedule_tool,
             "cancel_monitor": cancel_tool, "list_monitors": list_tool}
+
+
+# ── watch lifecycle: start + persist + rehydrate (watches survive restarts) ──
+def _start_watch(channel, thread_ts, client, loop, brain_mode, broker,
+                 source_factory, cadence_s, resolved, lat, lon, window,
+                 seed: WeatherState = None) -> str:
+    """Stand up (or re-stand after a restart) one watch. The spec is persisted in
+    cma_config.json so a broker restart can rehydrate it; `seed` pre-loads the
+    last-told state so a rehydrated watch doesn't re-announce an unchanged outlook."""
+    if source_factory is None:
+        source_factory = OpenMeteoSource
+    when = f"{_dow(window[0])} ({window[0]})"
+    mid = f"{channel}:{resolved}:{window[0]}"
+
+    async def sink_post(st: WeatherState, first: bool):
+        if brain_mode == "cma":
+            state_line = (f"state={st.category}; {st.summary}; "
+                          f"watch window {when} {window[1]}:00–{window[2]}:00")
+            ping = await broker.proactive_update(
+                channel, resolved, state_line, first,
+                _make_handlers(channel, thread_ts, client, loop, brain_mode, broker,
+                               source_factory, cadence_s))
+            await client.chat_postMessage(channel=channel, thread_ts=thread_ts, text=ping)
+        else:
+            await client.chat_postMessage(channel=channel, thread_ts=thread_ts,
+                                          text=phrase_update(resolved, st, first))
+
+    def on_update(st, first):   # the spine's callback is sync; bridge onto the loop
+        _remember_last(mid, st)                     # persist what we last told them
+        loop.create_task(sink_post(st, first))
+
+    # check hourly until the ride window ends (bounded at 16 days of checks)
+    window_end = datetime.strptime(window[0], "%Y-%m-%d").replace(hour=window[2])
+    hours_left = max(1, int((window_end - datetime.now()).total_seconds() // 3600) + 1)
+
+    MGR.schedule_monitor(Monitor(
+        id=mid,
+        label=f"{resolved} · {when}",
+        source=source_factory(lat, lon),
+        window=window,
+        cadence_s=cadence_s,                 # hourly in production
+        on_update=on_update,
+        max_ticks=min(hours_left, 24 * 16),
+        log=True,                            # heartbeat per check in the server log
+    ))
+    if seed is not None:
+        MGR.seed_last(mid, seed)             # set before the first tick runs
+    _persist_watch(mid, channel, thread_ts, resolved, lat, lon, window, cadence_s,
+                   seed)
+    return when
+
+
+def _persist_watch(mid, channel, thread_ts, resolved, lat, lon, window, cadence_s, last):
+    import cma_broker
+    cfg = cma_broker.load_config()
+    cfg.setdefault("watches", {})[mid] = {
+        "channel": channel, "thread_ts": thread_ts, "place": resolved,
+        "lat": lat, "lon": lon, "window": list(window), "cadence_s": cadence_s,
+        "last": [last.category, [list(h) for h in last.hazards]] if last else None,
+    }
+    cma_broker.save_config(cfg)
+
+
+def _remember_last(mid, st: WeatherState):
+    import cma_broker
+    cfg = cma_broker.load_config()
+    if mid in cfg.get("watches", {}):
+        cfg["watches"][mid]["last"] = [st.category, [list(h) for h in st.hazards]]
+        cma_broker.save_config(cfg)
+
+
+def _unpersist_watches(channel):
+    import cma_broker
+    cfg = cma_broker.load_config()
+    w = cfg.get("watches", {})
+    for mid in [k for k in w if k.startswith(channel + ":")]:
+        w.pop(mid)
+    cma_broker.save_config(cfg)
+
+
+def _rehydrate_watches(client, loop, brain_mode, broker):
+    """On broker start: re-stand every persisted watch whose ride day hasn't passed,
+    seeding each with the last-told state so nothing gets re-announced unchanged."""
+    import cma_broker
+    cfg = cma_broker.load_config()
+    watches, kept = cfg.get("watches", {}), 0
+    for mid, w in list(watches.items()):
+        if w["window"][0] < date.today().isoformat():
+            watches.pop(mid)                  # ride day passed while we were down
+            continue
+        seed = None
+        if w.get("last"):
+            cat, hazards = w["last"]
+            seed = WeatherState(cat, tuple(tuple(h) for h in hazards), "")
+        _start_watch(w["channel"], w["thread_ts"], client, loop, brain_mode, broker,
+                     None, w.get("cadence_s", 3600), w["place"], w["lat"], w["lon"],
+                     tuple(w["window"]), seed=seed)
+        kept += 1
+    cma_broker.save_config(cfg)
+    if kept:
+        print(f"   rehydrated {kept} watch(es) from before the restart")
 
 
 _NAMES: dict[str, str] = {}
@@ -393,7 +464,7 @@ def build_app():
 
         await _handle_rule_based(text, handlers, say, thread_ts)
 
-    return app
+    return app, mode, brain
 
 
 async def _handle_rule_based(text, handlers, say, thread_ts):
@@ -416,7 +487,9 @@ async def _handle_rule_based(text, handlers, say, thread_ts):
 
 async def main():
     from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
-    app = build_app()
+    app, mode, brain = build_app()
+    _rehydrate_watches(app.client, asyncio.get_running_loop(), mode,
+                       brain if mode == "cma" else None)
     handler = AsyncSocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
     print("weekend-window is live on Slack (Socket Mode). @-mention it in your channel.")
     await handler.start_async()

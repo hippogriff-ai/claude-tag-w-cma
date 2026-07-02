@@ -34,6 +34,10 @@ Every Claude-Tag behavior is carried by a **real CMA primitive** (`cma_broker.py
   geocoding + the spine and answers `user.custom_tool_result` (with backlog catch-up after a broker restart).
 - **Proactive pings go through the session**: a watch's weather change is fed in as a `[weather-watch update …]`
   message and the **model phrases the channel ping** — so it also remembers what it told the group.
+- **Watches survive restarts**: each watch's spec + last-told state are persisted (`cma_config.json`) and
+  rehydrated on broker start, seeded so an unchanged outlook is never re-announced. (The fully CMA-native
+  version — scheduled Deployments + a webhook-attached broker + memory-based change detection — is designed in
+  `../SPEC.md`'s appendix as the v2 direction.)
 
 The agent needs **no network access** (its environment is deny-by-default) — weather and geocoding run broker-side,
 the "keep execution host-side via custom tools" pattern.
